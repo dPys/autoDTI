@@ -1,0 +1,512 @@
+#!/bin/bash
+#set -x
+#    openDTI: A dMRI pipeline for efficient and comprehensive DTI analysis
+#    Copyright (C) 2016  AUTHOR: Derek Pisner
+#    Contributors: Adam Bernstein, Aleksandra Klimova, Matthew Allbright
+#
+#    openDTI is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU Affero General Public License as published
+#    by the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    openDTI is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU Affero General Public License for more details.
+#
+#    You should have received a copy of the complete GNU Affero General Public
+#    License with openDTI in a file called LICENSE.txt. If not, and/or you simply have
+#    questions about licensing and copyright/patent restrictions with openDTI, please
+#    contact the primary author, Derek Pisner, at dpisner@utexas.edu
+export LC_ALL=C
+
+####Script USAGE OPTIONS####
+Usage() {
+    echo -e ""
+    echo -e "--------------------------------USAGE INSTRUCTIONS------------------------------------"
+    echo -e ""
+    echo -e "FEED_openDTI <Base/Working directory PATH> -p <Participant ID> -rawDWI <DWI dicoms directory PATH> -rawT <T1 Anatomical raw dicoms directory PATH> [options]"
+    echo -e ""
+    echo -e "--------------------------------------------------------------------------------------"
+    echo -e ""
+    echo -e ""
+    echo -e "-------------------------------------EXAMPLE------------------------------------------"
+    echo -e ""
+    echo -e "FEED_openDTI /data/TBIMODEL -p TM100 -rawDWI '/mnt/data1/TBIMODEL/RAW_data/TM100/DTI_72_SLICEACC_2_FLEET_0013' -rawT '/mnt/data1/TBIMODEL/RAW_data/TM100/T1_MPRAGE_1MM_0029' -rawP2A '/mnt/data1/TBIMODEL/RAW_data/TM100/DTI_72_SLICEACC_2_FLEET_P__A_0019' -prep -seq 2 -EC -nl -vr "0 78" -r -n 11 -t -b -f -T -reinit -stats -D"
+    echo -e ""
+    echo -e "--------------------------------------------------------------------------------------"
+    echo -e ""
+    echo -e ""
+    echo -e "*REQUIRED INPUTS"
+    echo -e "(Base/Working directory Path, in quotes. e.g. '/data/TBIMODEL')"
+    echo -e ""
+    echo -e ""
+    echo -e "-p\t(Participant ID, e.g. TM100). This can also just be any arbitrary identifier."
+    echo -e ""
+    echo -e ""
+    echo -e "--------------------------------------------------------------------------------------"
+    echo -e ""
+    echo -e "*SEMI-REQUIRED INPUTS. IF THESE FLAGS ARE NOT INCLUDED, THE SCRIPT WILL PROMPT THE \nUSER TO SPECIFY PATHS THROUGH A ZENITY BROWSER. THESE FLAGS COULD BE IGNORED \nIF THE PATHS ARE HARDCODED OR YOU ARE RESUMING A PRIOR PREPROCESSING RUN."
+    echo -e ""
+    echo -e ""
+    echo -e "-rawDWI\t(Follow this flag with the name of the directory, in quotes, containing \n\traw diffusion dicoms to be preprocessed.)"
+    echo -e ""
+    echo -e "-rawT\t(Follow this flag with the name of the directory, in quotes, containing \n\traw anatomical dicoms for a T1 MPRAGE or T2 sequence (but not both) to be \n\tused for FREESURFER reconstruction.)"
+    echo -e ""
+    echo -e "--------------------------------------------------------------------------------------"
+    echo -e ""
+    echo -e ""
+    echo -e "--------------------------------------------------------------------------------------"
+    echo -e ""
+    echo -e "*OPTIONAL INPUTS. IF THESE FLAGS ARE OMITTED, THE SCRIPT WILL RUN WITH DEFAULT VALUES."
+    echo -e ""
+    echo -e "------------------------------------PREPROCESSING-------------------------------------"
+    echo -e ""
+    echo -e "-prep\t(Preprocessing. *THIS MUST BE USED ALONGSIDE ANY OTHER PREPROCESSING FLAGS!)"
+    echo -e ""
+    echo -e "-N\t(.nrrd format conversion for 3DSlicer)"
+    echo -e ""
+    echo -e "-ec\t(Runs old eddy correction)"
+    echo -e ""
+    echo -e "-nc\t(skips conversion from dicom to nifti of main dwi dataset. Assumes\n\toriginal_data.nii.gz already exists in the subject's preprocessing output \n\tdirectory)"
+    echo -e ""
+    echo -e "-FMC\t(Runs fieldmap correction if -rawPHASE and -rawMAG paths to fieldmap directories are included)"
+    echo -e ""
+    echo -e "-r\t(Rotate bvecs based on the ouput of eddy/eddy_correct)"
+    echo -e ""
+    echo -e "-nl\t(NLSAM Denoising option. Note: currently only available on \n\tdebian/ubuntu/mint OS's)"
+    echo -e ""
+    echo -e "-seq\t(Acceleration factor: 1 = standard/non-accelerated, 2 = MB 2X Acceleration,\n\t3 = MB 3X Acceleration, etc.)"
+    echo -e ""
+    echo -e "-EC\t(New eddy correction type with/without TOPUP. Warning! To utilize the TOPUP \n\t(i.e. estimating and correcting susceptibility induced distortions),\n\tyou must have a separate dataset consisting of just b0's (ideally with reverse polarity)."
+    echo -e ""
+    echo -e "-TE\t(Follow flag with TE for fieldmap correction)"
+    echo -e ""
+    echo -e "-dwell\t(Follow flag with dwi dwell time for fieldmap correction)"
+    echo -e ""
+    echo -e "-vr\t(Manually remove direction volumes from unpreprocessed data file and associated \n\tbval/bvec files. Follow flag with space-delimited volume numbers to be removed \n\tin quotes (e.g. -vr \"0 10 15\")"
+    echo -e ""
+    echo -e "-avr\t(Automatically remove direction volumes from dataset based on excess \n\ttranslation/rotation detected from ec_plot)"
+    echo -e ""
+    echo -e "-rawP2A\t(Follow this flag with the name of the directory, in quotes, containing \n\traw reverse-phase encoded b0 dicoms only if new eddy correction with \n\tTOPUP is being run)"
+    echo -e ""
+    echo -e "-rawMAG\t(Follow this flag with the name of the directory, in quotes, containing \n\traw magnitude fieldmap dicoms only if acquisition is from a SIEMENS scanner.\n\t*NOTE: To use fieldmap correction, both rawPHASE and rawMAG flags must be included\n\tSimply including rawPHASE and rawMAG will turn on fieldmap correction)"
+    echo -e ""
+    echo -e "-rawPHASE\t(Follow this flag with the name of the directory, in quotes, containing \n\traw phase fieldmap dicoms only if acquisition is from a SIEMENS scanner. \n\t*NOTE: To use fieldmap correction, both rawPHASE and rawMAG flags must be included \n\tSimply including rawPHASE and rawMAG will turn on fieldmap correction)"
+    echo -e ""
+    echo -e "-reslice\t(Including this flag will convert final preprocessed image to isotropic \n\tvoxel type. *WARNING: Only use this option is you are certain that \n\tyour dMRI acquisition has anisotropic voxels)."
+    echo -e ""
+    echo -e "-rdout\t(Follow flag with dwi total readout time for TOPUP/EDDY correction)"
+    echo -e "--------------------------------------------------------------------------------------"
+    echo -e ""
+    echo -e ""
+    echo -e "---------------------------MODEL FITTING / TRACTOGRAPHY FLAGS-------------------------"
+    echo -e ""
+    echo -e "-t\t(Runs DTIFIT)"
+    echo -e ""
+    echo -e "-b\t(Runs bedpostx)"
+    echo -e ""
+    echo -e "-dt\t(Runs deterministic tractography using DTK. Follow this flag with either \n\t"'DTI'" for DTI tractography or "'ODF'" for HARDI/Q-Ball tractography)"
+    echo -e ""
+    echo -e "-T\t(Runs TRACULA)"
+    echo -e ""
+    echo -e "-reinit\t(Automatically checks for missing/incomplete tracts and reinitializes \n\ttractography for those tracts <40 voxels in size by choosing a different initial guess)"
+    echo -e ""
+    echo -e "--------------------------------------------------------------------------------------"
+    echo -e ""
+    echo -e ""
+    echo -e "-----------------------------------FREESURFER FLAGS------------------------------------"
+    echo -e ""
+    echo -e "-f\t(Runs FREESURFER reconstruction)"
+    echo -e ""
+    echo -e "-surf\t(Builds FREESURFER Pial surface)"
+    echo -e ""
+    echo -e "-stats\t(Populates white and grey matter stats)"
+    echo -e ""
+    echo -e "-q\t(QA in FREESURFER)"
+    echo -e ""
+    echo -e "--------------------------------------------------------------------------------------"
+    echo -e ""
+    echo -e ""
+    echo -e "-------------------------------NETWORK ANALYSIS FLAGS---------------------------------"
+    echo -e ""
+    echo -e "-pn\t(Generate 3d volumes of freesurfer parcellation and sub-cortical\n\tsegmentation labels for use as nodes in connectome seed mask)"
+    echo -e ""
+    echo -e "-c\t(Build structural connectome matrix using probtrackx2)"
+    echo -e ""
+    echo -e "--------------------------------------------------------------------------------------"
+    echo -e ""
+    echo -e ""
+    echo -e "---------------------------------MISCELLANEOUS FLAGS----------------------------------"
+    echo -e ""
+    echo -e "-vo\t(View outputs in fslview/freeview at the end of each stage)"
+    echo -e ""
+    echo -e "-n\t(Number of cores for openMP multithreading)"
+    echo -e ""
+    echo -e "-gpu\t(Use GPU for all gpu optimized functions. *Note: the ~/.bashrc variable \n\tFSLGECUDAQ must be set with the name of your GPUs queue if you have a job \n\tscheduler installed)"
+    echo -e ""
+    echo -e "-D\t(Auto-delete existing preprocessed files. Default is Interactive. \n\tWARNING: Be careful when using the auto-delete option. Ensure \n\teverything is backed up on your system)"
+    echo -e ""
+    echo -e "-h\t View command-line options"
+    echo -e ""
+    echo -e "-debug\t Run pipeline in debug mode to get command-by-command verbosity"
+    echo -e ""
+    echo -e "--------------------------------------------------------------------------------------"
+    echo -e ""
+    echo -e "\tTo instead add or modify default settings for pipeline:\n\tRevise $openDTI_HOME/Main_scripts/config.ini"
+    echo -e ""
+    echo -e "--------------------------------------------------------------------------------------"
+    exit 1
+}
+
+[ "$1" = "" ] || [ "$1" == "-h" ] && Usage
+
+##########################################################################################################
+##Check that openDTI_HOME environment variable is set
+if [ -z "$openDTI_HOME" ]; then
+    echo -e "\n\n\n openDTI_HOME environment variable not set. For openDTI to run, you must update your ~/.bashrc file with export openDTI_HOME={path/to/your/openDTI base directory}."
+    exit 1
+fi
+
+##Source defualt variable values from .config file
+source "$openDTI_HOME"/Main_scripts/config.ini
+
+##########################################################################################################
+##############################################
+### Parse command line flags/options START ###
+##############################################
+##Set study directory
+make_absolute(){
+    dir=$1;
+    if [ -d ${dir} ]; then
+    OLDWD=`pwd`
+    cd ${dir}
+    dir_all=`pwd`
+    cd $OLDWD
+    else
+    dir_all=${dir}
+    fi
+    echo ${dir_all}
+}
+
+[ "$1" = "" ] && Usage
+
+myopts="$@"
+
+##Study directory (1st path specified)
+Study=`make_absolute $1`
+Study=`echo $Study | sed 's/\/$/$/g'`
+
+## 1) Set Options
+shift
+while [ ! -z "$1" ]
+do
+  case "$1" in
+      -rawDWI) dwi_dir=$2;shift;;
+      -rawP2A) P2A=$2;shift;;
+      -rawT) T1directory=$2;shift;;
+      -rawMAG) mag_dir=$2;shift;;
+      -rawPHASE) phase_dir=$2;shift;;
+      -p) PARTIC=$2;shift;;
+      -prep) preproc=1;;
+      -nc) noconv=1;;
+      -ec) old_eddy=1;;
+      -FMC) fieldmap=1;;
+      -r) rotate_bvecs=1;;
+      -vr) volrem=$2;shift;;
+      -avr) auto_volrem=1;;
+      -t) tensor=1;;
+      -b) bpx=1;;
+      -dt) det_type=$2;shift;;
+      -f) parcellate=1;;
+      -T) tracula=1;;
+      -surf) buildsurf=1;;
+      -stats) stats=1;;
+      -c) probtracking=1;;
+      -nl) NLSAM=1;;
+      -seq) sequence=$2;shift;;
+      -n) NumCoresMP=$2;shift;;
+      -EC) new_eddy=1;;
+      -N) NRRD=1;;
+      -q) QA=1;;
+      -vo) view_outs=1;;
+      -gpu) gpu=1;;
+      -dwell) dwell=$2;shift;;
+      -TE) TE=$2;shift;;
+      -reinit) reinit_check=1;;
+      -pn) prep_nodes=1;;
+      -D) DEL=1;;
+      -debug) debug=1;;
+      -reslice) reslice=1;;
+      -rdout) TOTAL_READOUT=$2;shift;;
+  esac
+  shift
+done
+
+## 2) Collect option values
+opts="--base=$Study --rawDWI="$dwi_dir" --rawP2A="$P2A" --rawT="$T1directory" --rawMAG="$mag_dir" --rawPHASE="$phase_dir" --p="$PARTIC" --prep=$preproc --nc=$noconv --ec=$old_eddy --FMC=$fieldmap --r=$rotate_bvecs --vr=$volrem --avr=$auto_volrem --t=$tensor --b=$bpx --dt="$det_type" --f=$parcellate --T=$tracula --surf=$buildsurf --stats=$stats --c=$probtracking --nl=$NLSAM --seq=$sequence --n=$NumCoresMP --EC=$new_eddy --N=$NRRD --q=$QA -vo=$view_outs --gpu=$gpu --dwell="$dwell" --TE="$TE" --reinit=$reinit_check --pn=$prep_nodes --D=$DEL --debug=$debug --reslice=$reslice --rdout="$TOTAL_READOUT""
+opts="$opts"
+############################################
+### Parse command line flags/options END ###
+############################################
+##Get rid of terminal-gui warnings
+export NO_AT_BRIDGE=1
+
+##Check if debug mode activated
+if [[ $debug == 1 ]]; then
+    set -x
+fi
+
+############################################
+### CHECK FOR REQUIRED INPUT COMPLETION ####
+############################################
+
+if [ -z "$Study" ]; then
+    echo -e "\n\n\nPlease enter a directory path to the base folder where you would like to run openDTI. Type: FEED_openDTI.sh -h for command-line options."
+    exit 0
+fi
+
+if [ -z "$PARTIC" ]; then
+    echo -e "\n\n\nPlease enter a participant ID number. Type: FEED_openDTI.sh -h for command-line options."
+    exit 0
+fi
+
+###################################################
+######### BUILDING ANALYSIS ENVIRONMENT ###########
+###################################################
+
+start=$SECONDS
+starting=$start
+
+#Create output_dir for appropriate sequence type
+if [[ $sequence == 1 ]]; then
+    if [ ! -d "$Study"/dti_preproc ]; then
+	mkdir "$Study"/dti_preproc
+    fi
+    #Set output_dir variable
+    output_dir="$Study"/dti_preproc
+else
+    if [ ! -d "$Study"/MB"$sequence" ]; then
+	mkdir "$Study"/MB"$sequence"
+    fi
+    #Set output_dir variable
+    output_dir="$Study"/MB"$sequence"
+fi
+
+if [ ! -d "$output_dir"/"$PARTIC"/logs ]; then
+    mkdir -p "$output_dir"/"$PARTIC"/logs
+fi
+
+timestamp=`date`
+echo -e "\n\n\n\n\n\n\n\n\n\n"$timestamp"\n" >> "$output_dir"/"$PARTIC"/logs/runlog_"$PARTIC".txt
+exec &> >(tee -i "$output_dir"/"$PARTIC"/logs/runlog_"$PARTIC".txt)
+exec 2>&1
+
+##Browse for directories containing raw DWI data if hard-coded find command fails
+if [ -z "$dwi_dir" ] && [[ $preproc == 1 && $noconv != 1 && $after_eddy != 1 ]]; then
+    dwi_dir="`zenity --file-selection --directory --filename="$Study" --title="Please Specify the Directory Containing the Raw DWI DICOMs to Process for "$PARTIC" for sequence $sequence"`"
+    wait
+    if [ -z "$dwi_dir" ]; then
+	echo -e "\n\n\nIf browsing for the directory does not function properly, you can specify the target directory name, in quotes, on the command line with the -rawDTI flag.\n\n\n"
+	if [ -d "$output_dir"/"$PARTIC" ]; then
+	    rmdir "$output_dir"/"$PARTIC" 2>/dev/null
+	fi
+    exit 1
+    fi
+fi
+
+##Browse for directories containing raw reverse-phase encoded B0 data if hard-coded find command fails
+if [[ $eddy_type == 1 && $preproc == 1 && $noconv != 1 && $after_eddy != 1 ]]; then
+    if [ -z "$P2A" ]; then
+        P2A=`zenity --file-selection --directory --filename=$Study --title="Please Specify the Directory Containing the P->A B0 DICOMs for $PARTIC for sequence $sequence"`
+        wait    
+    fi
+    if [ -z "$P2A" ]; then
+        echo -e "\n\n\nIf browsing for the directory does not function properly, you can specify the target directory name, in quotes, on the command line with the -rawP2A flag.\n\n\n"
+        if [ -d "$output_dir"/"$PARTIC" ]; then
+            rmdir "$output_dir"/"$PARTIC" 2>/dev/null
+        fi
+    exit 1
+    fi
+fi
+
+##Browse for directories containing raw T1 anatomical data if hard-coded find command fails
+if [ -z "$T1directory" ] && [[ $preproc == 1 && $noconv != 1 && $after_eddy != 1 && $parcellate == 1 ]]; then
+    T1directory=`zenity --file-selection --directory --filename=$Study --title="Please Specify the Directory Containing the Raw T1 MPRAGE Anatomical DICOMS for $PARTIC"`
+    wait
+    if [ -z "$T1directory" ]; then
+        echo -e "\n\n\nIf browsing for the directory does not function properly, you can specify the target directory name, in quotes, on the command line with the -rawT flag.\n\n\n"
+	if [ -d "$output_dir"/"$PARTIC" ]; then
+	    rmdir "$output_dir"/"$PARTIC" 2>/dev/null
+	fi
+        exit 1
+    fi
+fi
+
+##Force/interactive delete pre-existing files
+if [ -d "$output_dir"/"$PARTIC" ] && [[ $preproc == 1 && $noconv != 1 && $after_eddy != 1 ]]; then
+    if [ ! -z $DEL ]; then
+        DD="f"
+        ##Delete any pre-existing files in raw directory
+        find "$dwi_dir" -iname '*.nii.gz' -exec rm -"$DD" {} \; 2>/dev/null
+        find "$dwi_dir" -iname '*.bvec' -exec rm -"$DD" {} \; 2>/dev/null
+        find "$dwi_dir" -iname '*.bval' -exec rm -"$DD" {} \; 2>/dev/null
+        find "$dwi_dir" -iname '*.bvecs' -exec rm -"$DD" {} \; 2>/dev/null
+        find "$dwi_dir" -iname '*.bvals' -exec rm -"$DD" {} \; 2>/dev/null        
+        find "$P2A" -iname '*.nii.gz' -exec rm -"$DD" {} \; 2>/dev/null
+        find "$T1directory" -iname '*.nii' -exec rm -"$DD" {} \; 2>/dev/null
+        find "$mag_dir" -iname '*.nii' -exec rm -"$DD" {} \; 2>/dev/null
+        find "$phase_dir" -iname '*.nii' -exec rm -"$DD" {} \; 2>/dev/null
+
+        ##Delete any pre-existing files in bedpostx subdirectories
+        rm -r -"$DD" "$output_dir"/"$PARTIC"/"bedpostx_"$PARTIC"" 2>/dev/null
+        rm -r -"$DD" "$output_dir"/"$PARTIC"/bedpostx_"$PARTIC".bedpostX 2>/dev/null
+
+        ##Delete any pre-existing files in preprocessing directory
+        rm -r -"$DD" "$output_dir"/"$PARTIC"/* 2>/dev/null
+
+    elif [ -z $DEL ] && [[ `ls -l "$output_dir"/"$PARTIC" | wc -l` != 0 ]]; then
+        echo -e "\n\n\nWarning! you have `ls -l "$output_dir"/"$PARTIC" | wc -l` existing files in "$PARTIC"'s preprocessing directory. To avoid file conflicts and overwrites, it is recommended that you use the -D flag with FEED_openDTI.sh (which will erase existing files in "$PARTIC"'s preprocessing directory) and rerun this subject from scratch.\n\n\n"
+    fi
+fi
+
+echo -e "\n\n\nCHECKING INPUTS...\n\n\n"
+##Parse eddy correction options
+if [[ $new_eddy == 1 && $old_eddy == 1 ]]; then
+    echo -e "\n\n\nYou cannot specify two types of eddy correction. Use EITHER the -EC flag or the -ec flag, but not both. Type: FEED_openDTI.sh -h for command-line options."
+    exit 1
+fi
+
+if [[ "$old_eddy" == 1 ]]; then
+    eddy_type=0
+elif [[ "$new_eddy" == 1 ]]; then
+    if [ -z "$P2A" ] && [ ! -f ""$Study"/dti_preproc/"$PARTIC"/P2A.nii.gz" ]; then
+        eddy_type=2
+    else
+        eddy_type=1
+    fi
+elif [ -f ""$Study"/dti_preproc/"$PARTIC"/eddy_corrected_data.nii.gz" ] && [[ $auto_volrem != 1 ]]; then
+    after_eddy=1
+    echo "WARNING: No eddy correction type selected..."
+else
+    eddy_type=0
+fi
+
+##Handle avr exception
+if [[ $after_eddy == 1 ]]; then
+    eddy_type=0
+fi
+
+if [[ $old_eddy == 0 && $new_eddy == 0 && $preproc == 1 ]]; then
+    after_eddy=1
+    echo -e "\n\n\nWARNING: You have not included an eddy correction flag; that is, -ec or -EC. Unless you are skipping this step to re-run later stages on an existing preprocessed dataset, it is recommended that you perform some form of eddy correction in your preprocessing run. Type: FEED_openDTI.sh -h for command-line options.\n\n\n"    
+fi
+
+##Turn on E_switch if -avr and -EC flags are both used
+if [[ $auto_volrem == 1 && ( $eddy_type == 1 || $eddy_type == 2 ) ]]; then
+    E_switch=1
+    eddy_type=0
+else
+    E_switch=0
+fi
+
+##Further check for missing inputs of key source data
+if [ -z "$dwi_dir" ] && [[ $preproc == 1 && $noconv != 1 && $after_eddy != 1 ]]; then
+    echo -e "\n\n\nERROR: You did not enter a path to a diffusion directory containing raw dicoms.\n\n\n"
+    exit 0
+fi
+
+if [[ $eddy_type == 1 && $preproc == 1 && $after_eddy == 1 ]]; then
+    if [ -z "$P2A" ]; then
+	echo -e "\n\n\nERROR: Warning you did not enter a path to a directory for a second B0s acquisition raw dicoms. If you did not collect reverse phase encoded B0's, you can either use a separate dataset from the same subject consisting of only B0's (i.e. not reverse phase encoded), or you can run the old version of eddy correction. To run old eddy_correct, simply use the -ec flag with FEED_openDTI instead of -EC.\n\n\n"
+	exit 0
+    fi
+fi
+
+if [[ ( $eddy_type == 1 || $eddy_type == 2 ) && $preproc == 1 ]]; then
+    if [ -z "$TOTAL_READOUT" ]; then
+	echo -e "\n\n\nYou have selected the TOPUP/EDDY correction option but you need to enter a total readout value using the -rdout flag.\n\n\n"
+        exit 0
+    fi
+fi
+	
+##Display inputs for user as double-check
+if [[ $preproc == 1 && $noconv != 1 && $after_eddy != 1 ]]; then
+    #Read out input stream
+    echo -e "\n\n\nThe study directory for $PARTIC is "$Study"\nThe source directory specified containing raw dMRI dicoms is "$dwi_dir"\nThe source directory specified containg raw T1-weighted dicoms is "$T1directory"\nYou are analyzing a diffusion sequence acquired with "$sequence"X multiband acceleration. Volumes to be automatically removed before preprocessing: "$volrem".\nScanner type used to acquired DWI images: "$SCANNER" with "$Numcoils" channel head-coil. \n*Note: If these scanner settings are incorrect, you may edit the default values in $openDTI_HOME/Main_scripts/config.ini\n\n\n"
+fi
+
+##Check for raw Magnitude and Phase fieldmap dirs
+if [ ! -z "$mag_dir" ] && [ ! -z "$phase_dir" ] && [[ $fieldmap == 1 ]]; then
+    fieldmap="1"
+elif [ ! -z "$mag_dir" ] && [ ! -z "$phase_dir" ] && [[ $fieldmap != 1 ]]; then
+    fieldmap="0"
+    echo -e "\n\n\nWARNING: You have included paths to the raw Magnitude and raw Phase fieldmap data, but you have not used the -FMC flag, so fieldmap correction will be skipped. If you wish to instead run preprocessing including the fugue-based fieldmap correction step, you must also include the -FMC flag along with -rawMAG and-rawPHASE. Type: FEED_openDTI.sh -h for command-line options.\n\n\n"
+elif [[ (! -z "$mag_dir" && -z "$phase_dir") ]] || [[ ( -z "$mag_dir" && ! -z "$phase_dir") ]]; then
+    echo "If you are using a fieldmap during preprocessing, you must include the -FMC flag AND both the -rawMAG and -rawPHASE flags (and each of -rawMAG and -rawPHASE must be followed by paths to the directories containing the Magnitude and Phase fieldmap dicoms, respectively."
+    exit 0
+elif [[ $fieldmap == 1 ]] && [ -f ""$Study"/dti_preproc/"$PARTIC"/FieldMap_Magnitude.nii.gz" ] && [ -f ""$Study"/dti_preproc/"$PARTIC"/FieldMap_Phase.nii.gz" ]; then
+    fieldmap="1"
+else
+    fieldmap=0
+fi
+if [[ $fieldmap == 1 ]]; then
+    if [ -z $dwell ] || [ -z $TE ]; then
+	echo -e "\n\n\nYou have selected the fieldmap correction option but you need to enter both a dwell time and a TE value using the -dwell and -TE flags, respectively.\n\n\n"
+	exit 0
+    fi
+fi
+
+##Check for presence of raw DWI directory path if fieldmap option is selected
+if [[ $preproc == 1 ]] && [ -z "$dwi_dir" ] && [[ $fieldmap == 1 ]]; then
+    if [ -f ""$Study"/dti_preproc/"$PARTIC"/FieldMap_Magnitude.nii.gz" ] && [ -f ""$Study"/dti_preproc/"$PARTIC"/FieldMap_Phase.nii.gz" ]; then
+	echo "Using existing FieldMap_Magnitude.nii.gz and FieldMap_Phase.nii.gz in "$PARTIC"'s "$Study"/dti_preproc directory"
+    else
+        echo -e "\n\n\nYou must provide the path to your raw dwi directory using the -rawDWI flag in order to run fieldmap correction."
+        exit 0
+    fi
+fi
+
+##Check for presence of raw DWI directory path if fieldmap option is selected
+if [[ $preproc == 1 ]] && [ -z "$dwi_dir" ] && [[ $eddy_type == 1 ]] && [ ! -f "$output_dir"/"$PARTIC"/P2A.nii.gz ] && [[ ( $noconv == 1 || $after_eddy == 1 ) ]]; then
+    echo -e "\n\n\nYou must provide the path to your raw dwi directory using the -rawDWI flag in order to run new eddy correction with the -nc flag."
+    exit 0
+fi
+
+##If det_type variable is set, turn on Deterministics Tractography pipeline
+if [ ! -z "$det_type" ]; then
+    det_tractography=1
+fi
+
+##Automatically detects the number of openMP cores (i.e. on a single node, or on an openMP-enabled cluster) available for parallel computing
+#cores=`cat /proc/cpuinfo | awk '/^processor/{print $3}' | tail -1`
+#NumCoresMP=`echo $(echo "$cores"/2 | bc -l | awk '{printf "%.0f",$0}')`
+
+##Configure openMP settings
+omp_pe=""$openMP_queue","$NumCoresMP""
+
+##Create parallel log directory for fsl_sub .o and .e output files
+if [[ $parallel_type == 'SLURM' || $parallel_type == 'SGE' || $parallel_type == 'PBS' ]]; then    
+    if [ ! -d "$output_dir"/"$PARTIC"/parallel_logs ]; then
+        mkdir "$output_dir"/"$PARTIC"/parallel_logs
+    fi
+fi
+
+## 3) Fill remaining empty variables with null string if they are unused/unnecessary for run type
+##The 'sink'-->list all variable hear that will need to be filled with 'Null' if they are empty. To be safe, every configuration available should be added to this list.
+TOTAL_vars=debug,starting,dwi_dir,P2A,output_dir,OddSlices,PARTIC,sequence,T1directory,Study,preproc,tracula,buildsurf,probtracking,eddy_type,bpx,parcellate,stats,NumCores,E_switch,NRRD,parallel_type,QA,NumCoresMP,NLSAM,noconv,after_eddy,det_tractography,fieldmap,mag_dir,phase_dir,rotate_bvecs,tensor,volrem,auto_volrem,dwell,det_type,gpu,reinit_check,omp_pe,view_outs,max_gpu_threads,TE,conversion_type,SCANNER,Numcoils,NRRD,prep_nodes,ALLOCATION,reslice,TOTAL_READOUT
+
+for i in $(echo $TOTAL_vars | sed "s/,/ /g"); do
+    j=$( eval echo "\$$i" )
+    if [[ -z "${j// }" ]]; then
+        #echo "Filling $i because it is empty..."
+        export "$i"='Null' 
+	source 1.sh 2>/dev/null &
+    fi
+done
+
+#echo "$eddy_type"
+#exit 0
+
+## 4) Run through all processing steps in pipeline using the above specified files
+openDTI.sh "$dwi_dir" "$P2A" "$output_dir" "$OddSlices" "$PARTIC" "$sequence" "$T1directory" "$Study" "$preproc" "$tracula" "$buildsurf" "$probtracking" "$eddy_type" "$bpx" "$parcellate" "$stats" "$NumCores" "$E_switch" "$NRRD" "$parallel_type" "$QA" "$NumCoresMP" "$NLSAM" "$noconv" "$after_eddy" "$det_tractography" "$fieldmap" "$mag_dir" "$phase_dir" "$rotate_bvecs" "$tensor" "$volrem" "$auto_volrem" "$dwell" "$det_type" "$gpu" "$reinit_check" "$omp_pe" "$view_outs" "$max_gpu_threads" "$TE" "$conversion_type" "$SCANNER" "$Numcoils" "$starting" "$NRRD" "$prep_nodes" "$ALLOCATION" "$debug" "$reslice" "$TOTAL_READOUT"
