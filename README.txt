@@ -18,20 +18,16 @@
 #    License with OpenDTI in a file called LICENSE.txt. If not, and/or you simply have 
 #    questions about licensing and copyright/patent restrictions with openDTI, please 
 #    contact the primary author, Derek Pisner, at dpisner@utexas.edu
-
-###################################################################################
-################################# ABOUT openDTI ###################################
 ###################################################################################
 
-## About
-	OpenDTI is an open-source, automated (yet user-adaptable) pipeline designed for running highly efficient, flexible, and comprehensive single-subject diffusion magnetic resonance imaging (dMRI) analysis that obviates the need for ongoing user interaction at each analysis stage. openDTI covers core stages of analysis including: preprocessing, quality-control, global deterministic and probabilistic tractography, tragtographic metric extraction (e.g. average weighted FA, MD, RD, ADC values for individual tracts), database population, structural connectome-mapping, and network analysis.
+	OpenDTI was built using SGE, PBS, and SLURM schedulers, but can be implemented on any supercomputer configuration or local machine. It is BIDS-compliant, but through decision-tree logic, it also learns from your files so as to process dMRI data in any format with any acquisition parameters, even if those parameters vary across a dataset. OpenDTI obviates the need for ongoing user interaction at each analysis stage. openDTI covers core stages of analysis including: preprocessing, quality-control, global deterministic and probabilistic tractography, tragtographic metric extraction, database population, and structural connectome-mapping.
 
 ## Aims and the lanaguage(s) of dMRI
 	The aim of OpenDTI is to enable near-total automation and flexible customization of each stage in dMRI analysis through a highly-verbose pipeline that auto-decides based on the unique characteristics of your data and the computational resources available how to optimally run each analysis stage. OpenDTI is continually developed using an amalgamation of existing popular software (e.g. FSL, FREESURFER, Diffusion Toolkit). openDTI harnesseses the simplicity of UNIX shell scripting as foundational OS syntax, the power and speed of of C/C++ for most resource-intensive functions, and the flexibility of python to cover most other operations that would be less convenient, impossible, or inefficient to execute with shell scripting and to provide 'wrappers' that ensure interoperability of functions originally built in other programming languages like MATLAB or javascript. OpenDTI autoamtically adapts to different dMRI data types (i.e. multiple directions/ high b-values/ HARDI/ DSI/ Q-ball) as well as detects and optimally utilizes available hardware capabilities for maximal operating efficiency (e.g. auto-detects local cores for use with openMP and MPI, utilizes GPU's for CUDA-enabled acceleration, as well as job schedulers like SGE, UNIVA, Torque/PBS, Slurm, or Condor for queuing parallel jobs), but also allows the user to easily and manually adjust these for exceptions that may occur. Other aims of OpenDTI are straightforwardness, portability, and simplicity-- both for the developer and especially for the user. Although openDTI is built to provide a highly automated framework that can facilitate more efficient dMRI software development, its ultimate objective is to provide an unprecented level of flexibility in dMRI analysis to the end-user. Thus, minimalism, verbosity, and automation are central to the philosophy of OpenDTI's development. Along these lines, we anticipate that OpenDTI will facilitate rapid and automated analyses for very large dMRI datasets-- a goal that has, until now, been computationally infeasible. This latter expectation inevitably places an emphasis on highly parallelized code and a preference towards running OpenDTI on supercomputing clusters and developing functions with CUDA syntax alternatives that can capitalize on the immense computing power of GPU's. Given the emphasis on automation, one area that becomes critical for OpenDTI is automated error-checking, which must be as thorough as possible given the low degree of user interaction and manual visual inspection.
 	Additionally, and perhaps most importantly, we wish to incorporate a maximally comprehensive library of the most up-to-date computational tools in a well-organized and transparent framework to ensure the highest data quality and facilitate more rapid development in the field of dMRI image processing. To that end, it is also our hope that OpenDTI can become truly that -- open. If researchers in the DTI community can continue to develop and improve OpenDTI by incorporating new algorithms, routines, revisions, variations, and innovative stage varieties that can eventually elevate dMRI analysis to new heights of sensitivity and specificity in strucutral neuroimaging research, we can collectively improve the quality of research in the dMRI arena along with our ability to capture the subtle and rich detail of the immensely complicated wiring diagram that is the white matter of the human brain. 
-	The philosophy of OpenDTI is thus to take as the foundation of dMRI analysis the available functions in FSL and FREESURFER. Further, we choose UNIX at the systems-level of openDTI's operations because it is incredibly powerful and portable, and because we wish to keep syntax open-source and as close to the native tongue (i.e. bash and tcsh) of FSL and FREESURFER as possible to ensure that new developments from FSL and FREESURFER can be easily and readily integrated into our pipelines. Python, on the other hand, serves the critical role of 'filling in the gaps' of UNIX and C++ as much as possible to ensure that innovations outside of FSL and FREESURFER are still easily and readily available for inclusion in OpenDTI's developement. In essence, we wish to restrict python usage to especially cumbersome tasks that would be more difficult to accomplish in shell (e.g. any complex calculations, graph theoretical analysis, arrays, variable-rich functions, machine-learning extensions, etc.), as well as to wrap functions that would otherwise be too cumbersome to call from the command prompt (esp. MATLAB and other proprietary software tools). In this way, our goal is to create a unified workflow that can be run entirely from the command prompt with user syntax restricted to bash and python centrally, and underlying functions written in high-speed syntax like C/C++. Other languages (MATLAB, R, Perl) should only be used sparingly and for otherwise non-available features in the OpenDTI environment.
+	The philosophy of OpenDTI is thus to take as the foundation of dMRI analysis the available functions in FSL, FREESURFER, and Dipy. Further, we choose BASH at the systems-level of openDTI's operations because it is incredibly powerful and portable, and because we wish to keep syntax open-source and as close to the native tongue (i.e. bash and tcsh) of FSL and FREESURFER as possible to ensure that new developments from FSL and FREESURFER can be easily and readily integrated into our pipelines. Whereas comparable single-subject analysis pipelines for fMRI may be better addressed using Python-based tools such as the Nipype framework due to the tremendous heterogeneity of fMRI software available, the core obstacle for dMRI analysis pipelines is not software interoperability, but efficiency given the higher computational demands required to analyze dMRI data. Thus, the creators of openDTI contend that scalable dMRI analysis is more appropriately handled in a UNIX-dominant framework, where Python syntax instead serves the critical role of 'filling in the gaps' with functions that are not straightforward or readily available within FSL and FREESURFER, so as to still ensure that innovations outside of FSL and FREESURFER are still easily and readily available for inclusion in OpenDTI's developement. In essence, we wish to restrict python usage to especially cumbersome tasks that would be more difficult to accomplish in shell (e.g. any complex calculations, graph theoretical analysis, arrays, variable-rich functions, machine-learning extensions, etc.), as well as to wrap functions that would otherwise be too cumbersome to call from the command prompt (esp. MATLAB and other proprietary software tools). In this way, our goal is to create a unified workflow that can be run entirely from the command prompt with user syntax restricted to bash and python centrally, and underlying functions written in high-speed syntax like C/C++. Other languages (MATLAB, R, Perl) should only be used sparingly and for otherwise non-available features in the OpenDTI environment.
 
-## Workflow explained:
+OpenDTI's Engine explained:
 	The openDTI workflow firstly consists of two workflow engine scripts: FEED_openDTI.sh and openDTI.sh. FEED_openDTI.sh is a script for user input-- it has getopts command line options as well as default configuration options located in openDTI/Main_scripts/config.ini where you can optionally modify defaults for how you want your dMRI analysis pipeline to run (e.g. with TOPUP/EDDY, but without denoising; or without probabilistic tractography, but with deterministic tractography). One major goal of openDTI is to provide as many of these kinds of pipeline customization options to the user as possible. FEED_openDTI.sh gathers all necessary inputs, checks for missing inputs, and creates a variable environment (i.e. in python terms, this would be akin to a "namespace") with all of these options and file paths to be "passed" to openDTI.sh-- the workflow engine that ties all of the stages of the analysis pipeline together. In essence, what drives the workflow is therefore simple variable setting/passing based on triggers set by unique aspects emerging from previous stages that have completed. Some of these variables are switches to turn on/off various stages, whereas other variables actually contain values that are used to customize the way the stages run. OpenDTI.sh's primary job is to receive the core set of variables (e.g. containing filepaths to raw data directories and stage customization characteristics, etc.) from FEED_openDTI.sh and use them to trigger various different stage scripts run, also passing along active variables to those subsequent scripts. OpenDTI is variable passing. Each stage (preprocessing, diffusion model fitting, quality control, FREESURFER reconstruction, TRACULA, etc.) gets its own stage script located in the Stage_scripts directory. In sum, OpenDTI.sh works by sending all pertinent variables and file paths to each stage script relevant to the workflow setting selected. Those stage scripts in turn receive the active variables and relevant file paths in order to run all selected sub-stages in sequence.
 
 
@@ -55,26 +51,63 @@
 
 ##OPTIONAL: Altering default configuration options  (i.e. default variable values and stage settings) beyond what you list as flags with the FEED_openDTI.sh command can be accomplished by editing the openDTI/Main_scripts/config.ini file. These variables will be sourced as default values into FEED_openDTI.sh and use of command line flags will override these default values.
 
-##DIRECTORY STRUCTURE CREATED/UTILIZED BY OpenDTI:
- ├── <Study> <---Base directory.
- │   ├── "RAW_data" <----OpenDTI will copy your directories containing each specified sequence's dicoms into RAW_data.
- │   │   └── <PARTIC> <----Participant ID (which is also the directory name containing sequence folders.
- │   │       ├── <rawDWI> <----Directory containing diffusion weighted image sequence (DICOM series).
- │   │       ├── <rawT> <----Directory containing morphological (T1, T2) images (DICOM series).
- │   │       ├── <rawP2A (optional)> <----Directory containing reverse-phase B0 images (DICOM series).
- │   │       ├── <rawMAG (optional)> <----Directory containing fieldmap magnitude acquisition (DICOM series).
- │   │       ├── <rawPHASE (optional)> <----Directory containing fieldmap phase acquisition (DICOM series).
+##DERIVATIVE DIRECTORY STRUCTURE CREATED/UTILIZED BY OpenDTI:
+ ├── <RAW DATA> <--Directory containing subject subdirectories (ideally in BIDS format, but openDTI will prompt the user to browse for the appropriate files otherwise)
+ │   ├─── <sub-010001> <--Case 1: Subject directory in BIDS format (recommended)
+ │   │          ├── <ses-01> <--Run session
+ │   │      	        ├── <dwi> <--DWI directory 
+ │   │                  │     ├── <sub-010002_ses-01_dwi.bval> <--bval  
+ │   │                  │     ├── <sub-010002_ses-01_dwi.bvec> <--bvec
+ │   │                  │     ├── <sub-010002_ses-01_dwi.nii.gz> <--dwi image in .nii or .nii.gz (see BIDS specification: http://bids.neuroimaging.io/)
+ │   │                  │     ├── <sub-010002_ses-01_dwi.json> <--dwi acquisition parameters in .json format
+ │   │                  │
+ │   │                  ├── <anat> <--T1 MPRAGE directory containing  
+ │   │                  │     ├── <sub-010002_ses-01_acq-mp2rage_T1map.nii.gz> <--T1 MPRAGE anatomical image in .nii or .nii.gz (**optional for automated tractography and connectome mapping)
+ │   │                  │
+ │   │                  ├── <fmap> <--Fieldmap/reverse phase-encoded B0's directory
+ │   │			      ├── <sub-010002_ses-01_acq-SEfmapDWI_dir-PA_epi.nii.gz> <--Reverse-phase encoded P2A image in .nii or .nii.gz (**optional for improved preprocessing)
+ │   │                        ├── <sub-010002_ses-01_acq-GEfmap_run-01_magnitude1.nii.gz> <--Magnitude fieldmap image in .nii or .nii.gz (**optional for improved preprocessing)
+ │   │                        ├── <sub-010002_ses-01_acq-GEfmap_run-01_phasediff.nii.gz> <--Phase fieldmap image in .nii or .nii.gz (**optional for improved preprocessing)
+ │   │
+ │   ├─── <PARTIC_002> <--Case 2: Subject directory structured in any format, but converted to .nii/.nii.gz
+ │   │          ├── <{DWI image}.nii.gz> <--dwi image in .nii or .nii.gz
+ │   │		├── <{###}.bval> <--bval
+ │   │		├── <{###}.bvec> <--bvec
+ │   │          ├── <{T1 MPRAGE}.nii.gz> <--T1 MPRAGE anatomic image in .nii or .nii.gz (**optional for automated tractography and connectome mapping)
+ │   │          ├── <{P2A image}.nii.gz> <--Reverse-phase encoded P2A image in .nii or .nii.gz (**optional for improved preprocessing)
+ │   │          ├── <{Magnitude Fieldmap image}.nii.gz> <--Magnitude fieldmap image in .nii or .nii.gz (**optional for improved preprocessing)
+ │   │          ├── <{Phase Fieldmap image}.nii.gz> <--Magnitude fieldmap image in .nii or .nii.gz (**optional for improved preprocessing)
+ │   │ 
+ │   ├─── <PARTIC_003> <--Subject directory structured in any format, but as raw dicoms
+ │             ├── <dwi> <--DWI directory containing raw dicoms
+ │	       │     ├── <{###}.dcm>
+ │             │     ├── <{###}.dcm>
+ │             │     ├── ...
+ │             ├── <P2A> <--P2A directory containing raw dicoms
+ │             │     ├── <{###}.dcm>
+ │             │     ├── <{###}.dcm>
+ │             │     ├── ...
+ │             ├── <Fieldmap> <--Fieldmap directory containing raw dicoms
+ │             │     ├── <{###}.dcm>
+ │             │     ├── <{###}.dcm>
+ │             │     ├── ...
+ │             ├── <T1> <--T1 MPRAGE Anatomical directory containing raw dicoms
+ │                   ├── <{###}.dcm>
+ │                   ├── <{###}.dcm>
+ │                   ├── ...
+ │   
+ ├── <Study> <---Base directory where analyses are conducted in openDTI (i.e. BIDS derivatives)
+ │   ├─── <PREPROCESSING DIRECTORY> <----Automatically generated. 
  │   ├─── <TRACULA DIRECTORY> <----Automatically generated.
  │   │       ├── <diffusion_recons> <---- Automatically generated. FREESURFER recons and QA snaps are automatically stored here.
  │   │       ├── <tractography_output> <----Automatically generated. TRACULA results will output here.
- │   ├─── <PREPROCESSING DIRECTORY> <----Automatically generated.
+
+*Note: if BIDS format is used for raw data and an appropriate .json scan parameters file is generated, openDTI will detect and utilized this so that TE, TR, dwell, and readout values do not need to be specified manually on the command line in order to run those stages that require these values e.g. TOPUP/EDDY, fugue, etc.
 
  
 ##Installation: 
 You must run install.sh before using openDTI. To do this, first decompress the tarball into an installation directory of your choice.
-example: tar -C /usr/local -xzvf openDTI.tar.gz 
-
-Ensure sure that install.sh has execute permissions (if not, you can run: chmod a+x install.sh). Then, as root, 'cd' to the location of the base openDTI directory and run ./install.sh in the terminal.
+example: tar -xzvf openDTI.tar.gz 
 
 Finally, before running openDTI, add the following lines to your ~/.bashrc file and source ~/.bashrc files to enable to openDTI commandline environment:
 export openDTI_HOME={install directory path}
