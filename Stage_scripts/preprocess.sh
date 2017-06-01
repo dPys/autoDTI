@@ -73,6 +73,7 @@ TOTAL_READOUT=${51} ##Total readout value (for topup/eddy)
 
 #####PREPROCESSING--ADVANCED CONFIGURATION OPTIONS######
 frac_thresh=0.2 ##for BET fractional intensity thresholds
+fugue_smooth=4 ##Set fugue smoothing level for fieldmap correction
 ########################################################
 
 ##Exit if run without FEED_openDTI.sh
@@ -120,7 +121,7 @@ if [[ $noconv != 1 ]]; then
         mcverter "$dwi_dir" -o "$dwi_dir" -f fsl -d -n -q
 	wait
         ls "$dwi_dir"/*.nii | tail -1 | xargs gzip -f
-	wait    
+	wait
 
         ##Rename converted nifti file
         mv -v "$dwi_dir"/*.nii.gz "$output_dir"/"$PARTIC"/original_data.nii.gz 2>/dev/null
@@ -130,71 +131,116 @@ if [[ $noconv != 1 ]]; then
 
         echo -e "\n\n\nRENAMING CONVERTED NIFTI FILE AND BVEC/BVAL FILES AND COPYING INTO $output_dir...\n\n\n"
     fi
-    if [[ $volrem != 'Null' ]]; then
-        ##Split 4d file to 3d directional volumes
-        fslsplit original_data original_data_3d -t
-	wait	
-
-        ##Transpose bvecs rows to columns
-        ##Read in the bvecs file
-        BVECFILE=bvec
-        BVECNEWFILE=bvec_trans
-        ##Store it as an array
-        readarray BVEC < "$BVECFILE"
-        BVECNUM=${#BVEC[@]}
-        ##Check the number of directions
-        GRADNUM=$(echo "$BVEC" | wc -w )
-        ##Indexing at i=1 so we get rid of the first vol0 indexed as 0
-        if [ -f "$BVECNEWFILE" ]; then
-            echo -e "\n\n\n"$BVECNEWFILE" already exists. Numbering new versions...\n\n\n" >> bvec_change_log.txt
-            rm -f "$BVECNEWFILE"
+    if [[ $fieldmap == 1 ]]; then
+        ##Convert Magnitude file to .nii
+        if [[ $conversion_type == "dcm2niix" ]]; then
+            dcm2niix -z y "$mag_dir"
+            wait
+        elif [[ $conversion_type == "mriconvert" ]]; then
+            mcverter "$mag_dir" -o "$mag_dir" -f fsl -d -n -q
+        wait
+            ls "$mag_dir"/*.nii | tail -1 | xargs gzip -f
+            wait
         fi
-        echo -e "\n\n\nTRANSPOSED BVECS IS SAVED AS "$BVECNEWFILE"\n\n\n"
-        for ((i=1; i<=${GRADNUM}; i++ )); do
-            gx=$(echo ${BVEC[0]} | awk -v x=$i '{print $x}')
-            gy=$(echo ${BVEC[1]} | awk -v x=$i '{print $x}')
-            gz=$(echo ${BVEC[2]} | awk -v x=$i '{print $x}')
-            echo "$gx $gy $gz" >> "$BVECNEWFILE"
-        done
 
-        ##Create an array of all volumes specified for removal
-        declare -a volrem=($volrem)
-        ##Loop through that array and remove each corresponding 3d volume, revising bval and bvec upon each iteration
-        for i in `echo ${volrem[@]}`; do
-            rm -f "original_data_3d00$i.nii.gz"
-            echo  "Removing volume $i from dataset..."
-	    sed -e "$i"d bvec_trans > tmp_bvec && mv tmp_bvec bvec_trans
-	    wait
-            awk '{$'$i'=""; print $0}' bval | sed 's/  */ /g' > tmp_bval && mv tmp_bval bval
-	    wait
-            echo "Updating bvec and bval files..."
-        done
+        ##Convert Phase file to .nii
+        if [[ $conversion_type == "dcm2niix" ]]; then
+            dcm2niix -z y "$phase_dir"
+            wait
+        elif [[ $conversion_type == "mriconvert" ]]; then
+            mcverter "$phase_dir" -o "$phase_dir" -f fsl -d -n -q
+            ls "$phase_dir"/*.nii | tail -1 | xargs gzip -f
+            wait
+        fi
 
-        ##Transpose bvec back to horizontal x,y,z
-        awk '
-        { 
-            for (i=1; i<=NF; i++)  {
-                a[NR,i] = $i
-            }
-        }
-        NF>p { p = NF }
-        END {    
-            for(j=1; j<=p; j++) {
-                str=a[1,j]
-                for(i=2; i<=NR; i++){
-                    str=str" "a[i,j];
-                }
-                print str
-            }
-        }' bvec_trans > bvec
+        ##Rename converted nifti files and copy to output_dir
+        mag_file=`find "$mag_dir" -iname '*.nii.gz' -print | head -1`
+        mv -v "$mag_file" "$output_dir"/"$PARTIC"/FieldMap_Magnitude.nii.gz
+        wait
 
-        ##Merge the individual 3d volumes back together
-        fslmerge -t original_data original_data_3d*
-	wait
-
-        ##Clean up temp 3d volume set
-        rm -f original_data_3d*
+        phase_file=`find "$phase_dir" -iname '*.nii.gz' -print | head -1`
+        mv -v "$phase_file" "$output_dir"/"$PARTIC"/FieldMap_Phase.nii.gz
+        wait
     fi
+    if [[ $eddy_type == 1 ]]; then
+        ##Convert P2A to nifti
+        if [[ $conversion_type == "dcm2niix" ]]; then
+            dcm2niix -z y "$P2A"
+            wait
+        elif [[ $conversion_type == "mriconvert" ]]; then
+            mcverter "$P2A" -o "$P2A" -f fsl -d -n -q
+            wait
+            ls "$P2A"/*.nii | tail -1 | xargs gzip -f
+            wait
+        fi
+        wait
+    fi
+fi
+
+if [[ $volrem != 'Null' ]]; then
+    ##Split 4d file to 3d directional volumes
+    fslsplit original_data original_data_3d -t
+    wait
+
+    ##Transpose bvecs rows to columns
+    ##Read in the bvecs file
+    BVECFILE=bvec
+    BVECNEWFILE=bvec_trans
+    ##Store it as an array
+    c=0; while read line; do BVEC[c]=`echo "$line"`; let c=$c+1; done < "$BVECFILE"
+    BVECNUM=${#BVEC[@]}
+    ##Check the number of directions
+    GRADNUM=$(echo "$BVEC" | wc -w )
+    ##Indexing at i=1 so we get rid of the first vol0 indexed as 0
+    if [ -f "$BVECNEWFILE" ]; then
+        echo -e "\n\n\n"$BVECNEWFILE" already exists. Numbering new versions...\n\n\n" >> bvec_change_log.txt
+        rm -f "$BVECNEWFILE"
+    fi
+    echo -e "\n\n\nTRANSPOSED BVECS IS SAVED AS "$BVECNEWFILE"\n\n\n"
+    for ((i=1; i<=${GRADNUM}; i++ )); do
+        gx=$(echo ${BVEC[0]} | awk -v x=$i '{print $x}')
+        gy=$(echo ${BVEC[1]} | awk -v x=$i '{print $x}')
+        gz=$(echo ${BVEC[2]} | awk -v x=$i '{print $x}')
+        echo "$gx $gy $gz" >> "$BVECNEWFILE"
+    done
+
+    ##Create an array of all volumes specified for removal
+    declare -a volrem=($volrem)
+    ##Loop through that array and remove each corresponding 3d volume, revising bval and bvec upon each iteration
+    for i in `echo ${volrem[@]}`; do
+        rm -f "original_data_3d00$i.nii.gz"
+        echo  "Removing volume $i from dataset..."
+        sed -e "$i"d bvec_trans > tmp_bvec && mv tmp_bvec bvec_trans
+        wait
+        awk '{$'$i'=""; print $0}' bval | sed 's/  */ /g' > tmp_bval && mv tmp_bval bval
+        wait
+        echo "Updating bvec and bval files..."
+    done
+
+    ##Transpose bvec back to horizontal x,y,z
+    awk '
+    {
+        for (i=1; i<=NF; i++)  {
+            a[NR,i] = $i
+        }
+    }
+    NF>p { p = NF }
+    END {
+        for(j=1; j<=p; j++) {
+            str=a[1,j]
+            for(i=2; i<=NR; i++){
+                str=str" "a[i,j];
+            }
+            print str
+        }
+    }' bvec_trans > bvec
+
+    ##Merge the individual 3d volumes back together
+    fslmerge -t original_data original_data_3d*
+    wait
+
+    ##Clean up temp 3d volume set
+    rm -f original_data_3d*
 fi
 
 ##If bvec_change_log does not exist, create it.
@@ -255,7 +301,7 @@ if [[ $after_eddy != 1 ]]; then
 
 	##Extract and Combine all B0s collected for TOPUP
         for b0_index in $(< b0_indices_trans); do
-            fslroi original_data.nii.gz b0_A2P_"$b0_index" "$b0_index" 1 
+            fslroi original_data.nii.gz b0_A2P_"$b0_index" "$b0_index" 1
             wait
         done
 
@@ -263,7 +309,7 @@ if [[ $after_eddy != 1 ]]; then
         echo -e "\n\n\nMERGING A>>P B0's AND P>>A B0's IN PREPARATION FOR TOPUP...\n\n\n"
         fslmerge -t both_b0 b0_A2P_* 2>/dev/null
 	wait
-        
+
         rm -f b0_A2P_* 2>/dev/null
 
 	##Brain extract that average B0 using BET
@@ -274,42 +320,29 @@ if [[ $after_eddy != 1 ]]; then
         echo -e "\n\n\nRUNNING EDDY CORRECTION...\n\n\n"
 
         if [[ $parallel_type == 'SGE' ]] || [[ $parallel_type == 'PBS' ]] || [[ $parallel_type == 'SLURM' ]]; then
-	    export OMP_NUM_THREADS="$NumCores"
+	          export OMP_NUM_THREADS="$NumCores"
             eddy_openmp --imain=original_data.nii.gz --mask=hifi_b0_brain_mask.nii.gz --acqp=parameters.txt --index=index1.txt --bvecs=bvec --bvals=bval --out=eddy_corrected_data.nii.gz
-	    wait
+	          wait
         elif [[ $parallel_type == 'none' ]] || [[ $parallel_type == 'Null' ]]; then
             eddy --imain=original_data.nii.gz --mask=hifi_b0_brain_mask.nii.gz --acqp=parameters.txt --index=index1.txt --bvecs=bvec --bvals=bval --out=eddy_corrected_data.nii.gz
-	    wait
+	          wait
     	fi
-	echo -e "\n\n\nEDDY CORRECTION COMPLETED\n\n\n"
-	curr_timestamp=$(date +%s)
-	elapsed_time=$(expr $curr_timestamp - $start_timestamp)
+        echo -e "\n\n\nEDDY CORRECTION COMPLETED\n\n\n"
+        curr_timestamp=$(date +%s)
+        elapsed_time=$(expr $curr_timestamp - $start_timestamp)
         echo -e "Elapsed (Eddy): "$elapsed_time" \n" >> "$output_dir"/"$PARTIC"/elapsed_time.log
     fi
 
     if [[ $eddy_type == 1 ]]; then
-
-        ##Convert P2A to nifti
-        #if [[ $conversion_type == "dcm2niix" ]]; then
-        #    dcm2niix -z y "$P2A"
-        #    wait
-        #elif [[ $conversion_type == "mriconvert" ]]; then
-        #    mcverter "$P2A" -o "$P2A" -f fsl -d -n -q
-	#    wait
-        #    ls "$P2A"/*.nii | tail -1 | xargs gzip -f
-	#    wait
-        #fi
-        #wait
-        
         ##Navigate to P2A raw data directory for the participant
-        #mv -v "$P2A"/*.nii.gz "$output_dir"/"$PARTIC"/P2A.nii.gz 2>/dev/null
-	#wait
-        #echo -e "\n\n\nRENAMING CONVERTED P2A B0 NIFTI FILE AND COPYING INTO $output_dir IN PREPARATION FOR TOPUP/EDDY...\n\n\n"
+        mv -v "$P2A"/*.nii.gz "$output_dir"/"$PARTIC"/P2A.nii.gz 2>/dev/null
+	wait
+        echo -e "\n\n\nRENAMING CONVERTED P2A B0 NIFTI FILE AND COPYING INTO $output_dir IN PREPARATION FOR TOPUP/EDDY...\n\n\n"
 
-	P2Anumb0s=`fslnvols "$output_dir"/"$PARTIC"/P2A.nii.gz`    
+        P2Anumb0s=`fslnvols "$output_dir"/"$PARTIC"/P2A.nii.gz`
         echo -e "\n\n\nSEQUENCE HAS $b0s_TOTAL A>>P B0 VOLUMES AND $P2Anumb0s P>>A B0 VOLUMES...\n\n\n"
         echo -e "\n\n\nCONFIGURING PREPROCESSING ROUTINE FOR $DIRS_TOTAL directions and $VOLS_TOTAL VOLUMES IN TOTAL INCLUDING B0s...\n\n\n"
-    
+
         dim1=`fslval "$output_dir"/"$PARTIC"/original_data.nii.gz dim1`
         dim2=`fslval "$output_dir"/"$PARTIC"/original_data.nii.gz dim2`
         dim3=`fslval "$output_dir"/"$PARTIC"/original_data.nii.gz dim3`
@@ -318,8 +351,8 @@ if [[ $after_eddy != 1 ]]; then
 
         ##Check for odd number of slices
         rem=$(( $dim3 % 2 ))
-    
-        ##If odd # of slices, remove either top or bottom volume 
+
+        ##If odd # of slices, remove either top or bottom volume
         if [[ $rem != 0 ]]; then
             new_slices=$(echo "($dim3 - 1)" | bc)
             if [[ $OddSlices == 1 ]]; then
@@ -367,7 +400,7 @@ if [[ $after_eddy != 1 ]]; then
             k=$(( $k + 1 ))
         done
         echo "$indx" > index1.txt
-	sed -i 's/^ *//' index1.txt
+        sed -i 's/^ *//' index1.txt
 
         ##Extract and Combine all B0s collected for TOPUP
         for b0_index in $(< b0_indices_trans); do
@@ -378,7 +411,7 @@ if [[ $after_eddy != 1 ]]; then
         for i in $(seq 1 "$P2Anumb0s"); do
             printf "0 1 0 "$TOTAL_READOUT"\n" >> parameters.txt
         done
-        
+
         ##Merge all B0's: A>>P and P>>A
         echo -e "\n\n\nMERGING A>>P B0's AND P>>A B0's IN PREPARATION FOR TOPUP...\n\n\n"
         fslmerge -t both_b0 b0_A2P_* P2A.nii.gz 2>/dev/null
@@ -386,9 +419,9 @@ if [[ $after_eddy != 1 ]]; then
 
         ##Merge P2A B0 with A2P B0 closest in time
         #echo -e "\n\n\nMERGING LAST A>>P B0 AND P>>A b0's IN PREPARATION FOR TOPUP...\n\n\n"
-        #rec_B0=`ls b0_A2P_* | sort -k2 -th -n | tail -1`            
+        #rec_B0=`ls b0_A2P_* | sort -k2 -th -n | tail -1`
         #fslmerge -t both_b0 "$rec_B0" P2A.nii.gz 2>/dev/null
-        
+
         rm -f b0_A2P_* 2>/dev/null
 
         ##Run TOPUP Using Combined B0 File and specified acqparams file
@@ -402,7 +435,7 @@ if [[ $after_eddy != 1 ]]; then
 
         ##Used hifi_B0 from TOPUP to create an average B0
         fslmaths hifi_b0 -Tmean hifi_b0
-	wait        
+	wait
 
         ##Brain extract that average B0 using BET
         bet hifi_b0 hifi_b0_brain -f $frac_thresh -m
@@ -418,19 +451,19 @@ if [[ $after_eddy != 1 ]]; then
             eddy --imain=original_data.nii.gz --mask=hifi_b0_brain_mask.nii.gz --acqp=parameters.txt --index=index1.txt --bvecs=bvec --bvals=bval --out=eddy_corrected_data.nii.gz
 	    wait
         fi
-	echo -e "\n\n\nEDDY CORRECTION COMPLETED\n\n\n"
-	curr_timestamp=$(date +%s)
+      	echo -e "\n\n\nEDDY CORRECTION COMPLETED\n\n\n"
+      	curr_timestamp=$(date +%s)
         elapsed_time=$(expr $curr_timestamp - $start_timestamp)
         echo -e "Elapsed (Eddy from TOPUP): "$elapsed_time"\n" >> "$output_dir"/"$PARTIC"/elapsed_time.log
     fi
     if [[ $eddy_type == 1 || $eddy_type == 2 ]]; then
         ##Check for motion outliers
-        echo -e "CHECKING FOR MOTION OUTLIERS ...\n\n\n"    
+        echo -e "CHECKING FOR MOTION OUTLIERS ...\n\n\n"
         ec_plot_NEW.sh eddy_corrected_data.nii.gz
 	wait
-        
+
         ##Rename eddy extended outputs, if they are generated with your eddy version/type
-        mv eddy_corrected_data.nii.gz.eddy_movement_rms eddy_movement_rms.txt 2>/dev/null 
+        mv eddy_corrected_data.nii.gz.eddy_movement_rms eddy_movement_rms.txt 2>/dev/null
         mv eddy_corrected_data.nii.gz.eddy_outlier_map eddy_outlier_map.txt 2>/dev/null
         mv eddy_corrected_data.nii.gz.eddy_outlier_n_stdev_map eddy_outlier_n_stdev_map.txt 2>/dev/null
         mv eddy_corrected_data.nii.gz.eddy_outlier_report eddy_outlier_report.txt 2>/dev/null
@@ -451,7 +484,7 @@ if [[ $after_eddy != 1 ]]; then
         if [[ $E_switch == 1 ]]; then
             echo -e "\n\n\nFIRST MODELING MOVEMENT ACROSS VOLUMES USING AFFINE REGISTRATION. THIS SHOULD TAKE APPROXIMATELY 15-20 MINUTES...\n\n\n"
             ##Old Eddy Correction
-            eddy_correct original_data.nii.gz eddy_corrected_data.nii.gz 0 2>/dev/null 
+            eddy_correct original_data.nii.gz eddy_corrected_data.nii.gz 0 2>/dev/null
             wait
         else
 	    echo -e "\n\n\nRUNNING OLD EDDY CORRECTION...\n\n\n"
@@ -466,7 +499,7 @@ if [[ $after_eddy != 1 ]]; then
 	wait
 
         ##Check for motion outliers
-        echo -e "\n\n\nCHECKING FOR MOTION OUTLIERS ...\n\n\n"    
+        echo -e "\n\n\nCHECKING FOR MOTION OUTLIERS ...\n\n\n"
         ec_plot.sh eddy_corrected_data.ecclog
 	wait
     fi
@@ -490,11 +523,7 @@ if [[ $auto_volrem == 1 ]]; then
     BVECFILE=bvec
     BVECNEWFILE=bvec_trans
     ##Store it as an array
-    #readarray BVEC < "$BVECFILE"
-    while IFS=\= read var value; do
-        vars+=($var)
-        values+=($value)
-    done < "$BVECFILE"
+    c=0; while read line; do BVEC[c]=`echo "$line"`; let c=$c+1; done < "$BVECFILE"
     BVECNUM=${#BVEC[@]}
     ##Check the number of directions
     GRADNUM=$(echo "$BVEC" | wc -w )
@@ -510,44 +539,18 @@ if [[ $auto_volrem == 1 ]]; then
         gz=$(echo ${BVEC[2]} | awk -v x=$i '{print $x}')
         echo "$gx $gy $gz" >> "$BVECNEWFILE"
     done
-   
+
     ##Extract white-matter mask for SNR calculation
-    echo -e "\n\n\nExtracting rough white-matter SNR estimates for each directional volume...\n\n\n" 
-    bet eddy_corrected_data.nii.gz bet.nii.gz -m -f $frac_thresh
+    echo -e "\n\n\nExtracting SNR estimates for each directional volume...\n\n\n"
+    python $openDTI_HOME/Py_function_library/SNR_estimation.py "$output_dir"/"$PARTIC"/original_data.nii.gz "$output_dir"/"$PARTIC"/bval "$output_dir"/"$PARTIC"/bvec "0.25"
     wait
-
-    fslmaths eddy_corrected_data.nii.gz -mas bet.nii.gz masked_dwi.nii.gz
-    wait
-
-    fast -t 1 -o FAST masked_dwi.nii.gz
-    wait
-
-    mv FAST_pve_1.nii.gz wm_mask.nii.gz 2>/dev/null
-    wait
-
-    rm -f FAST_* 2>/dev/null
-
-    ##Calculate SNR of DWIs in WM mask
-    fslstats -t original_data.nii.gz -k wm_mask.nii.gz -m -s | awk  '{print $1/$2}' > dwi_snr.txt
-    wait
-
-    ##Specify number of standard deviations away from mean SNR as a basis for rejecting noisy (low) and unusually good SNR (high) volumes
-    #num_SD_high=20
-    num_SD_low=15
-
-    ##Determine SNR thresholds
-    avg=`awk '{s+=$1}END{print s/NR}' RS=" " dwi_snr.txt`
-    SD=`awk '{sum+=$1; sumsq+=$1*$1} END {print sqrt(sumsq/NR - (sum/NR)**2)}' dwi_snr.txt`
-    SNR_thresh_low=`echo $(echo $avg - $num_SD_low*$SD | bc)`
-    #SNR_thresh_high=`echo $(echo $avg + $num_SD_high*$SD | bc)`
-
-    high_noise_vols=`awk '$1 < "'"$SNR_thresh_low"'"' dwi_snr.txt | grep -f - -n dwi_snr.txt | sed 's/:.*//' | awk '{print $1}'` 2>/dev/null
-
-    #high_noise_vols=`awk '$1 < "'"$SNR_thresh_low"'" || $1 > "'"$SNR_thresh_high"'"' dwi_snr.txt | grep -f - -n dwi_snr.txt | sed 's/:.*//' | awk '{print $1}'` 2>/dev/null
+    if [ -f LOW_SNR_VOLS_LIST.txt ]; then
+        high_noise_vols=`cat LOW_SNR_VOLS_LIST.txt`
+    fi
 
     ##Check for venetian blind effect on any individual 3d volumes
     rm -f bad_vols_intraslice.txt 2>/dev/null
-    echo -e "\n\n\nUsing interlaced slicewise correlation to check for signal drop-out slices (i.e. the \"venentian blind effect\") across each z-slice of every 3d DWI volume...\n\n\n"  
+    echo -e "\n\n\nUsing interlaced slicewise correlation to check for signal drop-out slices (i.e. the \"venentian blind effect\") across each z-slice of every 3d DWI volume...\n\n\n"
     python $openDTI_HOME/Py_function_library/venetian_blind_check.py 'eddy_corrected_data.nii.gz' 0.05
     wait
     if [ -f bad_vols_intraslice.txt ]; then
@@ -580,16 +583,13 @@ if [[ $auto_volrem == 1 ]]; then
                 rm -f "original_data_3d00$j.nii.gz"
                 echo -e "\n\n\n\n\n`date`" >> bvec_change_log.txt
                 echo  "\nRemoving volume $j from dataset for excess translation..." >> bvec_change_log.txt
-
                 sed -e "$i"d bvec_trans > tmp_bvec && mv tmp_bvec bvec_trans
 		wait
-
                 awk '{$'$i'=""; print $0}' bval | sed 's/  */ /g' > tmp_bval && mv tmp_bval bval
 		wait
-
                 echo "Updating bvec and bval files..."
                 echo "$j" >> bad_vols.txt
-	    fi
+            fi
         done
     fi
     if [ ! -z "$n_trans" ]; then
@@ -602,38 +602,32 @@ if [[ $auto_volrem == 1 ]]; then
                 rm -f "original_data_3d00$j.nii.gz"
 		echo -e "\n\n\n\n\n`date`" >> bvec_change_log.txt
                 echo  -e "\nRemoving volume $j from dataset for excess translation..." >> bvec_change_log.txt
-
                 sed -e "$i"d bvec_trans > tmp_bvec && mv tmp_bvec bvec_trans
 		wait
-
                 awk '{$'$i'=""; print $0}' bval | sed 's/  */ /g' > tmp_bval && mv tmp_bval bval
-		wait
-
+                wait
                 echo "Updating bvec and bval files..."
                 echo "$j" >> bad_vols.txt
-	    fi
+            fi
         done
     fi
     if [ ! -z "$p_rot" ]; then
         for i in `echo $p_rot`; do
             j=`echo $(echo $i - 1 | bc)`
 	    if grep -q "$j" b0_indices_trans 2>/dev/null; then
-		continue
+                continue
 	    else
                 echo "Found rotation outlier volumes..."
 		rm -f "original_data_3d00$j.nii.gz"
                 echo -e "\n\n\n\n\n`date`" >> bvec_change_log.txt
                 echo  -e "\nRemoving volume $j from dataset for excess rotation..." >> bvec_change_log.txt
-
                 sed -e "$i"d bvec_trans > tmp_bvec && mv tmp_bvec bvec_trans
-		wait 
-
-                awk '{$'$i'=""; print $0}' bval | sed 's/  */ /g' > tmp_bval && mv tmp_bval bval
 		wait
-
+                awk '{$'$i'=""; print $0}' bval | sed 's/  */ /g' > tmp_bval && mv tmp_bval bval
+                wait
                 echo "Updating bvec and bval files..."
                 echo "$j" >> bad_vols.txt
-	    fi
+            fi
         done
     fi
     if [ ! -z "$n_rot" ]; then
@@ -646,19 +640,16 @@ if [[ $auto_volrem == 1 ]]; then
                 rm -f "original_data_3d00$j.nii.gz"
                 echo -e "\n\n\n\n\n`date`" >> bvec_change_log.txt
                 echo -e "\nRemoving volume $j from dataset for excess rotation..." >> bvec_change_log.txt
-
                 sed -e "$i"d bvec_trans > tmp_bvec && mv tmp_bvec bvec_trans
 		wait
-
                 awk '{$'$i'=""; print $0}' bval | sed 's/  */ /g' > tmp_bval && mv tmp_bval bval
-		wait
-
+                wait
                 echo "Updating bvec and bval files..."
                 echo "$j" >> bad_vols.txt
-	    fi
+            fi
         done
     fi
-    
+
     if [ ! -z "$high_noise_vols" ]; then
         for i in `echo $high_noise_vols`; do
             j=`echo $(echo $i - 1 | bc)`
@@ -670,16 +661,13 @@ if [[ $auto_volrem == 1 ]]; then
 	        rm -f "original_data_3d00$j.nii.gz"
                 echo -e "\n\n\n\n\n`date`" >> bvec_change_log.txt
                 echo -e "Removing volume $j from dataset on the basis of its SNR being "$num_SD_low" SD's less-than the average SNR across all direction volumes..." >> bvec_change_log.txt
-
                 sed -e "$i"d bvec_trans > tmp_bvec && mv tmp_bvec bvec_trans
-		wait
-
+                wait
                 awk '{$'$i'=""; print $0}' bval | sed 's/  */ /g' > tmp_bval && mv tmp_bval bval
-		wait
-
+                wait
                 echo "Updating bvec and bval files..."
                 echo "$j" >> bad_vols.txt
-	    fi
+            fi
         done
     fi
 
@@ -693,13 +681,10 @@ if [[ $auto_volrem == 1 ]]; then
 		echo -e "\n\n\n\n\n`date`" >> bvec_change_log.txt
                 echo -e "\nRemoving "$j" from dataset for probable venetian blind striping..." >> bvec_change_log.txt
                 rm -f "original_data_3d00$j.nii.gz"
-
                 sed -e "$i"d bvec_trans > tmp_bvec && mv tmp_bvec bvec_trans
                 wait
-
                 awk '{$'$i'=""; print $0}' bval | sed 's/  */ /g' > tmp_bval && mv tmp_bval bval
                 wait
-
                 echo "Updating bvec and bval files..."
                 echo "$j" >> bad_vols.txt
             fi
@@ -712,13 +697,13 @@ if [[ $auto_volrem == 1 ]]; then
 
     ##Transpose bvec back to horizontal x,y,z
     awk '
-    { 
+    {
         for (i=1; i<=NF; i++)  {
             a[NR,i] = $i
         }
     }
     NF>p { p = NF }
-    END {    
+    END {
         for(j=1; j<=p; j++) {
             str=a[1,j]
             for(i=2; i<=NR; i++){
@@ -739,12 +724,12 @@ if [[ $auto_volrem == 1 ]]; then
         if (( $(bc <<< "$perc_bad_vols > 0.1") )); then
             echo "WARNING: >10% of volumes auto-removed for excess motion! Consider dropping this subject from analysis."
             exit 0
-	elif [[ `cat $i/bvec_trans | wc -l` != `cat $i/bval | wc | awk '{print $2}'` ]]; then
+        elif [[ `cat $i/bvec_trans | wc -l` != `cat $i/bval | wc | awk '{print $2}'` ]]; then
             echo "ERROR: auto volume removal failed-- bvec and bval files have an unequal number of entries!"
             exit 0
         else
             rerun_prep=1
-	    echo -e "\n\n\nFOUND AND REMOVED $num_bad_vols PROBLEMATIC DWI VOLUMES...\n\n\n"
+            echo -e "\n\n\nFOUND AND REMOVED $num_bad_vols PROBLEMATIC DWI VOLUMES...\n\n\n"
             echo -e "Creating text file called volumes_removed.txt for record of which volumes were removed, and saving the original bvec and bval files as bvec_pre_avr and bval_pre_avr for reference even though these will not be used for any further preprocessing...\n\n\n"
             mv "$output_dir"/"$PARTIC"/'bad_vols.txt' "$output_dir"/"$PARTIC"/'volumes_removed.txt' 2>/dev/null
 	    wait
@@ -791,52 +776,19 @@ fi
 if [[ $fieldmap == 1 ]]; then
     cd "$output_dir"/"$PARTIC"
 
-    ##Set fugue smoothing level
-    fugue_smooth=4
-
     echo -e "\n\n\nAPPLYING FIELDMAP CORRECTION...\n\n\n"
 
-    if [ ! -f nodif_brain.nii.gz ]; then        
+    if [ ! -f nodif_brain.nii.gz ]; then
         ##Extract B0 image
         echo "Extracting B0..."
         fslroi eddy_corrected_data.nii.gz nodif.nii.gz 0 1
         wait
-        
+
         ##Run BET on B0 image
         echo "Extracting nodif brain mask..."
         bet nodif.nii.gz nodif_brain -m -f $frac_thresh
         wait
     fi
-
-    ##Convert Magnitude file to .nii
-    #if [[ $conversion_type == "dcm2niix" ]]; then
-        #dcm2niix -z y "$mag_dir"
-        #wait
-    #elif [[ $conversion_type == "mriconvert" ]]; then
-        #mcverter "$mag_dir" -o "$mag_dir" -f fsl -d -n -q
-	#wait
-        #ls "$mag_dir"/*.nii | tail -1 | xargs gzip -f
-        #wait
-    #fi
-
-    ##Convert Phase file to .nii
-    #if [[ $conversion_type == "dcm2niix" ]]; then
-        #dcm2niix -z y "$phase_dir"
-        #wait
-    #elif [[ $conversion_type == "mriconvert" ]]; then
-        #mcverter "$phase_dir" -o "$phase_dir" -f fsl -d -n -q
-        #ls "$phase_dir"/*.nii | tail -1 | xargs gzip -f
-        #wait
-    #fi
-
-    ##Rename converted nifti files and copy to output_dir
-    #mag_file=`find "$mag_dir" -iname '*.nii.gz' -print | head -1` 
-    #mv -v "$mag_file" "$output_dir"/"$PARTIC"/FieldMap_Magnitude.nii.gz
-    #wait
-
-    #phase_file=`find "$phase_dir" -iname '*.nii.gz' -print | head -1`
-    #mv -v "$phase_file" "$output_dir"/"$PARTIC"/FieldMap_Phase.nii.gz
-    #wait
 
     ##Prepare fieldmap
     echo -e "\n\n\nTE time is "$TE""
@@ -858,21 +810,21 @@ if [[ $fieldmap == 1 ]]; then
     fugue --loadfmap=fmap_rads_brain -s "$fugue_smooth" --savefmap="fmap_rads_brain_s"$fugue_smooth""
     wait
 
-    echo -e "\n\n\nWarping the magnitude image according to the deformation specified in the field map...\n\n\n"    
+    echo -e "\n\n\nWarping the magnitude image according to the deformation specified in the field map...\n\n\n"
     fugue -v -i FieldMap_Magnitude_brain --unwarpdir=y --dwell="$dwell" --loadfmap=fmap_rads.nii.gz -w FieldMap_Magnitude_brain_warpped
     wait
 
-    echo -e "\n\n\nLinearly registering the deformed magnitude image to brain extracted b0 image...\n\n\n"  
+    echo -e "\n\n\nLinearly registering the deformed magnitude image to brain extracted b0 image...\n\n\n"
     flirt -in FieldMap_Magnitude_brain_warpped.nii.gz -ref nodif_brain.nii.gz -out FieldMap_Magnitude_brain_warpped_2_nodif_brain -omat FieldMap_fieldmap2diff.mat
     wait
 
-    echo -e "\n\n\nApplying linear transformation to the field map...\n\n\n" 
+    echo -e "\n\n\nApplying linear transformation to the field map...\n\n\n"
     flirt -in "fmap_rads_brain_s"$fugue_smooth"" -ref nodif_brain.nii.gz -applyxfm -init FieldMap_fieldmap2diff.mat -out "fmap_rads_brain_"$fugue_smooth"_2_nodif_brain"
     wait
 
     echo -e "\n\n\nUndistorting the eddy corrected dataset using the smoothed, brain-masked, and registered field map...\n\n\n"
     fugue -v -i eddy_corrected_data.nii.gz --icorr --unwarpdir=y --dwell="$dwell" --loadfmap="fmap_rads_brain_"$fugue_smooth"_2_nodif_brain.nii.gz" -u eddy_corrected_data_FMC.nii.gz
-    wait        
+    wait
 
     echo -e "\n\n\nFIELDMAP CORRECTION COMPLETE\n\n\n"
 
@@ -885,7 +837,7 @@ fi
 ##Rotate bvec file to match eddy correction
 if [[ $rotate_bvecs == 1 ]] && [ ! -f "$output_dir"/"$PARTIC"/bvec_orig ]; then
     echo -e "\n\n\nROTATING BVEC FILE...\n\n\n"
-    if [ -f "$output_dir"/"$PARTIC"/eddy_corrected_data.ecclog ]; then    
+    if [ -f "$output_dir"/"$PARTIC"/eddy_corrected_data.ecclog ]; then
         echo -e "\n\n\n\n\n`date`" >> bvec_change_log.txt
         echo -e "\n\n\nROTATING BVEC FILE BASED ON OUTPUT FROM eddy_correct...\n\n\n"  >> bvec_change_log.txt
         fdt_rotate_bvecs bvec bvec_rotated eddy_corrected_data.ecclog
@@ -893,9 +845,9 @@ if [[ $rotate_bvecs == 1 ]] && [ ! -f "$output_dir"/"$PARTIC"/bvec_orig ]; then
         mv -v "$output_dir"/"$PARTIC"/bvec "$output_dir"/"$PARTIC"/bvec_orig 2>/dev/null
         wait
         mv -v "$output_dir"/"$PARTIC"/bvec_rotated "$output_dir"/"$PARTIC"/bvec 2>/dev/null
-        wait 
+        wait
     elif [ -f "$output_dir"/"$PARTIC"/eddy_corrected_data.nii.gz.eddy_rotated_bvecs ]; then
-        echo -e "\n\n\n\n\n`date`" >> bvec_change_log.txt        
+        echo -e "\n\n\n\n\n`date`" >> bvec_change_log.txt
 	echo -e "\n\n\nUSING ROTATED BVEC FILE AUTOMATICALLY OUTPUT FROM eddy...\n\n\n"  >> bvec_change_log.txt
         mv -v "$output_dir"/"$PARTIC"/bvec "$output_dir"/"$PARTIC"/bvec_orig 2>/dev/null
         wait
@@ -927,7 +879,7 @@ fi
 
 ##Denoising options
 if [[ $NLSAM == 1 ]]; then
-    echo -e "\n\n\nRUNNING DENOISING...\n\n\n" 
+    echo -e "\n\n\nRUNNING DENOISING...\n\n\n"
     ##Determine N
     if [[ $SCANNER == SIEMENS ]]; then
 	if [ "$Numcoils" -eq "32" ]; then
@@ -936,51 +888,36 @@ if [[ $NLSAM == 1 ]]; then
 	    N=2
 	else
 	    N=1
-	fi
+        fi
     else
-	N=1
+        N=1
     fi
 
-    if [ ! -f bet.nii.gz ]; then        
+    if [ ! -f bet.nii.gz ]; then
         ##Run BET on eddy output
         bet ""$input".nii.gz" bet.nii.gz -m -f $frac_thresh
         wait
-    fi  
+    fi
 
-
-    ##SGE/BEOWULF CLUSTER LEGACY SCRIPTS
-    ##Ensure safe cpu load levels before running Stabilizer or NLSAM
-    #trigger=30.00
-    #load=`cat /proc/loadavg | awk '{print $1}'`
-    #response=`echo | awk -v T=$trigger -v L=$load 'BEGIN{if ( L > T){ print "greater"}}'`
-    #if [[ $response == greater ]]; then
-    #    echo -e "\n\n\nWaiting for cpu load to go down before continuing with NLSAM denoising...\n\n\n"
-    #fi
-    #until [[ $response != greater ]]; do
-    #    sleep 5
-    #    load=`cat /proc/loadavg | awk '{print $1}'`
-    #    response=`echo | awk -v T=$trigger -v L=$load 'BEGIN{if ( L > T){ print "greater"}}'`
-    #done    
- 
     if [[ $parallel_type == 'SGE' ]] || [[ $parallel_type == 'PBS' ]] || [[ $parallel_type == 'SLURM' ]]; then
-        
+
         ##Determine number of z slices to determine max_threads
         z_slices=`fslval "$output_dir"/"$PARTIC"/original_data.nii.gz dim3`
 
         if [ "$NumCores" -ge "$z_slices" ]; then
             NumCoresNLSAM="$z_slices"
-   
+
             #Reset omp cores if z_slices check succeeds
             NumCoresMP="$NumCoresNLSAM"
         fi
-	export OMP_NUM_THREADS="$NumCoresMP"
-	##NLSAM
-	nlsam_denoising "$output_dir"/"$PARTIC"/"$input" "$output_dir"/"$PARTIC"/eddy_corrected_data_denoised.nii.gz $N "$output_dir"/"$PARTIC"/bval "$output_dir"/"$PARTIC"/bvec 5 -m "$output_dir"/"$PARTIC"/bet_mask.nii.gz --cores $NumCoresMP -f
-	wait
+      	export OMP_NUM_THREADS="$NumCoresMP"
+      	##NLSAM
+      	nlsam_denoising "$output_dir"/"$PARTIC"/"$input" "$output_dir"/"$PARTIC"/eddy_corrected_data_denoised.nii.gz $N "$output_dir"/"$PARTIC"/bval "$output_dir"/"$PARTIC"/bvec 5 -m "$output_dir"/"$PARTIC"/bet_mask.nii.gz --cores $NumCoresMP -f
+      	wait
     else
-	##NLMEANS
-	$openDTI_HOME/Py_function_library/denoise.py "$output_dir"/"$PARTIC"/"$input" "$output_dir"/"$PARTIC"/eddy_corrected_data_denoised.nii.gz
-	wait
+      	##NLMEANS
+      	$openDTI_HOME/Py_function_library/denoise.py "$output_dir"/"$PARTIC"/"$input" "$output_dir"/"$PARTIC"/eddy_corrected_data_denoised.nii.gz
+      	wait
     fi
     curr_timestamp=$(date +%s)
     elapsed_time=$(expr $curr_timestamp - $start_timestamp)
@@ -1008,7 +945,7 @@ if [ -z "$preprocessed_img" ]; then
     BVECFILE=bvec
     BVECNEWFILE="bvec_dtk"
     ##Store it as an array
-    readarray BVEC < "$BVECFILE"
+    c=0; while read line; do BVEC[c]=`echo "$line"`; let c=$c+1; done < "$BVECFILE"
     BVECNUM=${#BVEC[@]}
     ##Check the number of directions
     GRADNUM=$(echo "$BVEC" | wc -w )
