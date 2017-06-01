@@ -21,7 +21,7 @@ contact the primary author, Derek Pisner, at dpisner@utexas.edu
 ```
 ###################################################################################
 
-##Aims and the lanaguage(s) of dMRI
+Aims and the lanaguage(s) of dMRI
 I. OpenDTI was built using SGE, PBS, and SLURM schedulers, but can be implemented on any supercomputer configuration or local machine. It is BIDS-compliant, but through decision-tree logic, it also learns from your files so as to process dMRI data in any format with any acquisition parameters, even if those parameters vary across a dataset. OpenDTI obviates the need for ongoing user interaction at each analysis stage. openDTI covers core stages of analysis including: preprocessing, quality-control, global deterministic and probabilistic tractography, tragtographic metric extraction, database population, and structural connectome-mapping.
 
 II. The aim of OpenDTI is to enable near-total automation and flexible customization of each stage in dMRI analysis through a highly-verbose pipeline that auto-decides based on the unique characteristics of your data and the computational resources available how to optimally run each analysis stage. OpenDTI is continually developed using an amalgamation of existing popular software (e.g. FSL, FREESURFER, Diffusion Toolkit). openDTI harnesseses the simplicity of UNIX shell scripting as foundational OS syntax, the power and speed of of C/C++ for most resource-intensive functions, and the flexibility of python to cover most other operations that would be less convenient, impossible, or inefficient to execute with shell scripting and to provide 'wrappers' that ensure interoperability of functions originally built in other programming languages like MATLAB or javascript. OpenDTI autoamtically adapts to different dMRI data types (i.e. multiple directions/ high b-values/ HARDI/ DSI/ Q-ball) as well as detects and optimally utilizes available hardware capabilities for maximal operating efficiency (e.g. auto-detects local cores for use with openMP and MPI, utilizes GPU's for CUDA-enabled acceleration, as well as job schedulers like SGE, UNIVA, Torque/PBS, Slurm, or Condor for queuing parallel jobs), but also allows the user to easily and manually adjust these for exceptions that may occur. Other aims of OpenDTI are straightforwardness, portability, and simplicity-- both for the developer and especially for the user. Although openDTI is built to provide a highly automated framework that can facilitate more efficient dMRI software development, its ultimate objective is to provide an unprecented level of flexibility in dMRI analysis to the end-user. Thus, minimalism, verbosity, and automation are central to the philosophy of OpenDTI's development. Along these lines, we anticipate that OpenDTI will facilitate rapid and automated analyses for very large dMRI datasets-- a goal that has, until now, been computationally infeasible. This latter expectation inevitably places an emphasis on highly parallelized code and a preference towards running OpenDTI on supercomputing clusters and developing functions with CUDA syntax alternatives that can capitalize on the immense computing power of GPU's. Given the emphasis on automation, one area that becomes critical for OpenDTI is automated error-checking, which must be as thorough as possible given the low degree of user interaction and manual visual inspection.
@@ -50,7 +50,7 @@ OPTIONAL: Altering default configuration options  (i.e. default variable values 
 *Note: if BIDS format is used for raw data and an appropriate .json scan parameters file is generated, openDTI will detect and utilized this so that TE, TR, dwell, and readout values do not need to be specified manually on the command line in order to run those stages that require these values e.g. TOPUP/EDDY, fugue, etc.
 
  
-##Installation: 
+Installation: 
 You must run install.sh before using openDTI. To do this, first decompress the tarball into an installation directory of your choice. Example: 
 ```{bash}
 tar -xzvf openDTI.tar.gz 
@@ -61,7 +61,7 @@ export openDTI_HOME={install directory path}
 source $openDTI_HOME/Set_openDTI_Env.sh
 ```
 
-##THIRD-PARTY SOFTWARE INCLUDED WITH INSTALL
+THIRD-PARTY SOFTWARE INCLUDED WITH INSTALL
 ```
 1. dcm2nii must be able to run from the command line and it has been included in openDTI's core files to accomodate for this. The included installer script will automatically install dcm2nii to /usr/local/bin (If you experience any difficulties with the included dcm2nii executable, I recommend downloading dcm2nii as part of the MRIcron package from http://www.nitrc.org/frs/?group_id=152) and modifying preprocess.sh accordingly.
 	Author: Christopher Rorden
@@ -102,27 +102,7 @@ Diffusion Toolkit is a software tool for the performance of data reconstruction 
 ```
 8. For connectome reconstruction, the python script connectome_plot.py is used. It requires a few python dependencies (NumPy, matplotlib, nibabel, codecs). The installer script installs these automatically using pip (so be sure you have installed python-pip).
 ```
-##MULTI-SUBJECT BATCHING 
+MULTI-SUBJECT BATCHING 
 For batching multiple participants simultaneously, you can substitute participant ID's as a variable in a for loop. Upon each loop iteration, a subject's analysis pipeline will open in a new terminal window (Using other terminal types, you may be able to have each loop run sent to multiple tabs within a single window) *NOTE: for this to work, you will probably want to: 1) hard code the locations of your T1MPRAGE anatomical images (T1directory), DWI images (dwi_dir), and P2A images (P2A), otherwise the script will trigger the GUI for you to select these files manually for each loop iteration; and 2) Impose strict cpu and virtual memory restrictions in your parallel scheduler to ensure safe hardware usage (i.e. batching subejcts should really only be done with on a large cluster with a job scheduler/ batch queuing system installed). *Tip: be careful with system-level batch scripts. Test a few batch runs with only a stage or two specified before submitting many, and keep a close eye on your cores with top/htop.
 
 One template batch script has been included with the openDTI package to demonstrate how high-performance batching can be accomplished using a set of find commands, a parallel loop, and "tabbing" with the konsole terminal emulator or use of another batch tool such as Launcher.
-
-##DEVELOPERS
-
-About adding or modifying new variables and arms within openDTI
-Adding new variables can be accomplished by adding new variables either to the .config file or to FEED_openDTI.sh
-
-Adding new "arms" can be accomplished by adding new variables AND by adding new scripts to the main pipeline in openDTI.sh
-
-###
-(in construction)
-
-##Adding new variables to .config
-
-##Adding new variables to FEED_openDTI.sh
-#5 step variable construction process
-
-##Adding new "arms" to openDTI.sh
-
-
-
