@@ -19,8 +19,6 @@ License with OpenDTI in a file called LICENSE.txt. If not, and/or you simply hav
 questions about licensing and copyright/patent restrictions with openDTI, please 
 contact the primary author, Derek Pisner, at dpisner@utexas.edu
 ```
-###################################################################################
-
 Aims and the lanaguage(s) of dMRI
 I. OpenDTI was built using SGE, PBS, and SLURM schedulers, but can be implemented on any supercomputer configuration or local machine. It is BIDS-compliant, but through decision-tree logic, it also learns from your files so as to process dMRI data in any format with any acquisition parameters, even if those parameters vary across a dataset. OpenDTI obviates the need for ongoing user interaction at each analysis stage. openDTI covers core stages of analysis including: preprocessing, quality-control, global deterministic and probabilistic tractography, tragtographic metric extraction, database population, and structural connectome-mapping.
 
