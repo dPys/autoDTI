@@ -44,57 +44,8 @@ REQUIRED: read, write, and execute permissions on files and folders used by open
 HIGHLY RECOMMENDED: Parallel computing capabilities. openDTI was designed to be as parallelized and efficient as currently available technology permits. Thus, openDTI works most optimally on a cluster equipped with a job scheduler in either the GridEngine/Univa/SGE or PBS/Torque families. The FSL function fsl_sub should be customized accordingly to accommodate for the job scheduler type being used. Without a cluster/job scheduler to enabled parallelization, processing time for most stages of openDTI will increase substantially.
 OPTIONAL: Altering default configuration options  (i.e. default variable values and stage settings) beyond what you list as flags with the FEED_openDTI.sh command can be accomplished by editing the openDTI/Main_scripts/config.ini file. These variables will be sourced as default values into FEED_openDTI.sh and use of command line flags will override these default values.
 ```
-<sub>
-DERIVATIVE DIRECTORY STRUCTURE CREATED/UTILIZED BY OpenDTI:
-###### ├── <RAW DATA> <--Directory containing subject subdirectories (ideally in BIDS format, but openDTI will prompt the user ######to browse for the appropriate files otherwise)
-###### │   ├─── <sub-010001> <--Case 1: Subject directory in BIDS format (recommended)
-###### │   │          ├── <ses-01> <--Run session
-###### │   │      	        ├── <dwi> <--DWI directory 
-###### │   │                  │     ├── <sub-010002_ses-01_dwi.bval> <--bval  
-###### │   │                  │     ├── <sub-010002_ses-01_dwi.bvec> <--bvec
-###### │   │                  │     ├── <sub-010002_ses-01_dwi.nii.gz> <--dwi image in .nii or .nii.gz (see BIDS specification: http://bids.neuroimaging.io/)
-###### │   │                  │     ├── <sub-010002_ses-01_dwi.json> <--dwi acquisition parameters in .json format
-###### │   │                  │
-###### │   │                  ├── <anat> <--T1 MPRAGE directory containing  
-###### │   │                  │     ├── <sub-010002_ses-01_acq-mp2rage_T1map.nii.gz> <--T1 MPRAGE anatomical image in .nii or .nii.gz (**optional for automated tractography and connectome mapping)
-###### │   │                  │
-###### │   │                  ├── <fmap> <--Fieldmap/reverse phase-encoded B0s directory
-###### │   │			      ├── <sub-010002_ses-01_acq-SEfmapDWI_dir-PA_epi.nii.gz> <--Reverse-phase encoded P2A image in .nii or .nii.gz (**optional for improved preprocessing)
-###### │   │                        ├── <sub-010002_ses-01_acq-GEfmap_run-01_magnitude1.nii.gz> <--Magnitude fieldmap image in .nii or .nii.gz (**optional for improved preprocessing)
-###### │   │                        ├── <sub-010002_ses-01_acq-GEfmap_run-01_phasediff.nii.gz> <--Phase fieldmap image in .nii or .nii.gz (**optional for improved preprocessing)
-###### │   │
-###### │   ├─── <PARTIC_002> <--Case 2: Subject directory structured in any format, but converted to .nii/.nii.gz
-###### │   │          ├── <{DWI image}.nii.gz> <--dwi image in .nii or .nii.gz
-###### │   │		├── <{###}.bval> <--bval
-###### │   │		├── <{###}.bvec> <--bvec
-###### │   │          ├── <{T1 MPRAGE}.nii.gz> <--T1 MPRAGE anatomic image in .nii or .nii.gz (**optional for automated tractography and connectome mapping)
-###### │   │          ├── <{P2A image}.nii.gz> <--Reverse-phase encoded P2A image in .nii or .nii.gz (**optional for improved preprocessing)
-###### │   │          ├── <{Magnitude Fieldmap image}.nii.gz> <--Magnitude fieldmap image in .nii or .nii.gz (**optional for improved preprocessing)
-###### │   │          ├── <{Phase Fieldmap image}.nii.gz> <--Magnitude fieldmap image in .nii or .nii.gz (**optional for improved preprocessing)
-###### │   │ 
-###### │   ├─── <PARTIC_003> <--Subject directory structured in any format, but as raw dicoms
-###### │             ├── <dwi> <--DWI directory containing raw dicoms
-###### │	       │     ├── <{###}.dcm>
-###### │             │     ├── <{###}.dcm>
-###### │             │     ├── ...
-###### │             ├── <P2A> <--P2A directory containing raw dicoms
-###### │             │     ├── <{###}.dcm>
-###### │             │     ├── <{###}.dcm>
-###### │             │     ├── ...
-###### │             ├── <Fieldmap> <--Fieldmap directory containing raw dicoms
-###### │             │     ├── <{###}.dcm>
-###### │             │     ├── <{###}.dcm>
-###### │             │     ├── ...
-###### │             ├── <T1> <--T1 MPRAGE Anatomical directory containing raw dicoms
-###### │                   ├── <{###}.dcm>
-###### │                   ├── <{###}.dcm>
-###### │                   ├── ...
-###### │   
-###### ├── <Study> <---Base directory where analyses are conducted in openDTI (i.e. BIDS derivatives)
-###### │   ├─── <PREPROCESSING DIRECTORY> <----Automatically generated. 
-###### │   ├─── <TRACULA DIRECTORY> <----Automatically generated.
-###### │   │       ├── <diffusion_recons> <---- Automatically generated. FREESURFER recons and QA snaps are automatically stored here.
-###### │   │       ├── <tractography_output> <----Automatically generated. TRACULA results will output here.
+
+![Directory Tree Map](docs/dir_tree_map.png)
 
 *Note: if BIDS format is used for raw data and an appropriate .json scan parameters file is generated, openDTI will detect and utilized this so that TE, TR, dwell, and readout values do not need to be specified manually on the command line in order to run those stages that require these values e.g. TOPUP/EDDY, fugue, etc.
 
