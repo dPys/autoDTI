@@ -1,3 +1,4 @@
+![OpenDTI logo](openDTI_logo.png)
 
 ```
 OpenDTI: A dMRI pipeline for efficient and comprehensive DTI analysis
