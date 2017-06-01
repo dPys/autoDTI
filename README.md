@@ -45,7 +45,7 @@ HIGHLY RECOMMENDED: Parallel computing capabilities. openDTI was designed to be 
 OPTIONAL: Altering default configuration options  (i.e. default variable values and stage settings) beyond what you list as flags with the FEED_openDTI.sh command can be accomplished by editing the openDTI/Main_scripts/config.ini file. These variables will be sourced as default values into FEED_openDTI.sh and use of command line flags will override these default values.
 ```
 
-![Directory Tree Map](docs/dir_tree_map.png)
+![Directory Tree Map](dir_tree_map.png)
 
 *Note: if BIDS format is used for raw data and an appropriate .json scan parameters file is generated, openDTI will detect and utilized this so that TE, TR, dwell, and readout values do not need to be specified manually on the command line in order to run those stages that require these values e.g. TOPUP/EDDY, fugue, etc.
 
@@ -60,8 +60,8 @@ Finally, before running openDTI, add the following lines to your ~/.bashrc file 
 export openDTI_HOME={install directory path}
 source $openDTI_HOME/Set_openDTI_Env.sh
 ```
-##THIRD-PARTY SOFTWARE INCLUDED WITH INSTALL
 
+##THIRD-PARTY SOFTWARE INCLUDED WITH INSTALL
 ```
 1. dcm2nii must be able to run from the command line and it has been included in openDTI's core files to accomodate for this. The included installer script will automatically install dcm2nii to /usr/local/bin (If you experience any difficulties with the included dcm2nii executable, I recommend downloading dcm2nii as part of the MRIcron package from http://www.nitrc.org/frs/?group_id=152) and modifying preprocess.sh accordingly.
 	Author: Christopher Rorden
