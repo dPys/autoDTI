@@ -53,7 +53,6 @@ OPTIONAL: Altering default configuration options  (i.e. default variable values 
 ![Directory Tree Map](dir_tree_map.png)
 
 *Note: if BIDS format is used for raw data and an appropriate .json scan parameters file is generated, autoDTI will detect and utilized this so that TE, TR, dwell, and readout values do not need to be specified manually on the command line in order to run those stages that require these values e.g. TOPUP/EDDY, fugue, etc.
-```
 
 ~~~Installation~~~ 
 First decompress the tarball into an installation directory of your choice. Example: 
