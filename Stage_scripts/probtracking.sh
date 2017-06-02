@@ -1,21 +1,21 @@
 #!/bin/bash
-#    openDTI: A dMRI pipeline for efficient and comprehensive DTI analysis
+#    autoDTI: A dMRI pipeline for efficient and comprehensive DTI analysis
 #    Copyright (C) 2016  AUTHOR: Derek Pisner
 #    Contributors: Adam Bernstein, Aleksandra Klimova, Matthew Allbright
 #
-#    openDTI is free software: you can redistribute it and/or modify
+#    autoDTI is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU Affero General Public License as published
 #    by the Free Software Foundation, either version 3 of the License, or
 #    (at your option) any later version.
 #
-#    openDTI is distributed in the hope that it will be useful,
+#    autoDTI is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU Affero General Public License for more details.
 #
 #    You should have received a copy of the complete GNU Affero General Public
-#    License with openDTI in a file called LICENSE.txt. If not, and/or you simply have
-#    questions about licensing and copyright/patent restrictions with openDTI, please
+#    License with autoDTI in a file called LICENSE.txt. If not, and/or you simply have
+#    questions about licensing and copyright/patent restrictions with autoDTI, please
 #    contact the primary author, Derek Pisner, at dpisner@utexas.edu
 
 ##Variable inputs
@@ -28,9 +28,9 @@ tracdir=${6}
 prep_nodes=${7}
 debug=${8}
 
-##Exit if run without FEED_openDTI.sh
+##Exit if run without FEED_autoDTI.sh
 if [ $# -eq 0 ]; then
-    echo -e "\n\n\nYou must run openDTI by feeding command-line inputs to FEED_openDTI.sh. Type: FEED_openDTI.sh -h for command-line options. See README.txt for more instructions.\n\n\n"
+    echo -e "\n\n\nYou must run autoDTI by feeding command-line inputs to FEED_autoDTI.sh. Type: FEED_autoDTI.sh -h for command-line options. See README.txt for more instructions.\n\n\n"
     exit 1
 fi
 
@@ -121,7 +121,7 @@ if [[ $prep_nodes == 1 ]]; then
         wait
     fi
 
-    cp $openDTI_HOME/Stage_scripts/node_list.txt "$Study"/"$tracdir"/tractography_output/"$PARTIC"/probtrackx/label_order.txt 2>/dev/null
+    cp $autoDTI_HOME/Stage_scripts/node_list.txt "$Study"/"$tracdir"/tractography_output/"$PARTIC"/probtrackx/label_order.txt 2>/dev/null
     wait
  
     rm -f "$Study"/"$tracdir"/tractography_output/"$PARTIC"/probtrackx/seeds.txt 2>/dev/null 
@@ -183,6 +183,6 @@ LABELS_loc=""$Study"/"$tracdir"/tractography_output/"$PARTIC"/probtrackx/label_o
 ROIS_loc="$SUBJECTS_DIR/"$PARTIC"/label"
 
 ##Build connectome adjancency matrix
-python $openDTI_HOME/Py_function_library/connectome_plot.py $BASE_loc $LABELS_loc $ROIS_loc
+python $autoDTI_HOME/Py_function_library/connectome_plot.py $BASE_loc $LABELS_loc $ROIS_loc
 
 exit 0

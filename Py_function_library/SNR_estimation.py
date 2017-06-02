@@ -53,7 +53,7 @@ tenmodel=TensorModel(gtab)
 tensorfit=tenmodel.fit(data, mask=mask)
 
 print('Computing worst-case/best-case SNR using the corpus callosum...')
-threshold = (0.6, 1, 0, 0.1, 0, 0.1)
+threshold = (0.5, 1, 0, 0.1, 0, 0.1)
 CC_box = np.zeros_like(data[..., 0])
 
 mins, maxs = bounding_box(mask)
@@ -74,14 +74,21 @@ cfa_img = nib.Nifti1Image((cfa*255).astype(np.uint8), affine)
 mask_cc_part_img = nib.Nifti1Image(mask_cc_part.astype(np.uint8), affine)
 nib.save(mask_cc_part_img, 'mask_CC_part.nii.gz')
 
-region = 40
+
 fig = plt.figure('Corpus callosum segmentation')
 plt.subplot(1, 2, 1)
 plt.title("Corpus callosum (CC)")
 plt.axis('off')
 red = cfa[..., 0]
-plt.imshow(np.rot90(red[region, ...]))
+regions = np.zeros((len(red),2))
+for i in range(len(red)):
+    regions[i,1] = np.max(red[i, ...])
+    regions[i,0] = i
 
+max_int = np.max(regions[:,1])
+region = int(regions[np.where(regions[:,1] == max_int)][:,0][0])
+
+plt.imshow(np.rot90(red[region, ...]))
 plt.subplot(1, 2, 2)
 plt.title("CC mask used for SNR computation")
 plt.axis('off')

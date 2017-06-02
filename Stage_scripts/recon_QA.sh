@@ -1,21 +1,21 @@
 #!/bin/bash
-#    openDTI: A dMRI pipeline for efficient and comprehensive DTI analysis
+#    autoDTI: A dMRI pipeline for efficient and comprehensive DTI analysis
 #    Copyright (C) 2016  AUTHOR: Derek Pisner
 #    Contributors: Adam Bernstein, Aleksandra Klimova, Matthew Allbright
 #
-#    openDTI is free software: you can redistribute it and/or modify
+#    autoDTI is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU Affero General Public License as published
 #    by the Free Software Foundation, either version 3 of the License, or
 #    (at your option) any later version.
 #
-#    openDTI is distributed in the hope that it will be useful,
+#    autoDTI is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU Affero General Public License for more details.
 #
 #    You should have received a copy of the complete GNU Affero General Public
-#    License with openDTI in a file called LICENSE.txt. If not, and/or you simply have
-#    questions about licensing and copyright/patent restrictions with openDTI, please
+#    License with autoDTI in a file called LICENSE.txt. If not, and/or you simply have
+#    questions about licensing and copyright/patent restrictions with autoDTI, please
 #    contact the primary author, Derek Pisner, at dpisner@utexas.edu
 
 ##Variable inputs
@@ -30,9 +30,9 @@ NumCoresMP=${8}
 tracdir=${9}
 debug=${10}
 
-##Exit if run without FEED_openDTI.sh
+##Exit if run without FEED_autoDTI.sh
 if [ $# -eq 0 ]; then
-    echo -e "\n\n\nYou must run openDTI by feeding command-line inputs to FEED_openDTI.sh. Type: FEED_openDTI.sh -h for command-line options. See README.txt for more instructions.\n\n\n"
+    echo -e "\n\n\nYou must run autoDTI by feeding command-line inputs to FEED_autoDTI.sh. Type: FEED_autoDTI.sh -h for command-line options. See README.txt for more instructions.\n\n\n"
     exit 1
 fi
 
@@ -57,7 +57,7 @@ echo -e "\n\n\nCHECKING FOR FREESURFER RECON COMPLETION...\n\n\n"
 echo -e "\n\n\nRunning Quality Assessment of FREESURFER recon..."
 echo -e "\n\n\nIt is highly recommended that you check generated snapshots of segmentation and parcellation maps for obvious signs of error and fix accordingly using tkmedit and recon-all re-runs. An accurate aparc+aseg image is especially critical for TRACULA.\n\n\n"
 export SUBJECTS_DIR="$Study"/"$tracdir"/diffusion_recons
-export QA_TOOLS="$openDTI_HOME"/QAtools
+export QA_TOOLS="$autoDTI_HOME"/QAtools
 $QA_TOOLS/recon_checker -s ""$PARTIC"" -snaps-only 
 
 echo -e "\n\n\nPress [1] to correct the wm recon. Press any other key to skip this correction. If correcting wm.mgz, ensure that you save the correction as wm.mgz in the subject's recon mri/ directory.\n\n\n"; read WHITE

@@ -1,28 +1,28 @@
 #!/bin/bash
-#    openDTI: A dMRI pipeline for efficient and comprehensive DTI analysis
+#    autoDTI: A dMRI pipeline for efficient and comprehensive DTI analysis
 #    Copyright (C) 2016  AUTHOR: Derek Pisner
 #    Contributors: Adam Bernstein, Aleksandra Klimova, Matthew Allbright
 #
-#    openDTI is free software: you can redistribute it and/or modify
+#    autoDTI is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU Affero General Public License as published
 #    by the Free Software Foundation, either version 3 of the License, or
 #    (at your option) any later version.
 #
-#    openDTI is distributed in the hope that it will be useful,
+#    autoDTI is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU Affero General Public License for more details.
 #
 #    You should have received a copy of the complete GNU Affero General Public
-#    License with openDTI in a file called LICENSE.txt. If not, and/or you simply have
-#    questions about licensing and copyright/patent restrictions with openDTI, please
+#    License with autoDTI in a file called LICENSE.txt. If not, and/or you simply have
+#    questions about licensing and copyright/patent restrictions with autoDTI, please
 #    contact the primary author, Derek Pisner, at dpisner@utexas.edu
 
 export LC_ALL=C
 
 ##################################### BODY ###########################################
 
-## 5) Variables received from FEED_openDTI.sh (Add variables to this list and FEED_openDTI.sh as necessary to expand/customize). NOTE: ORDER MATTERS (I.E. MUST CORRESPOND TO THE ORDER SUPPPLIED AT THE END OF FEED_openDTI.sh AND ALL VARIABLES BEING RECEIVED CANNOT BE EMPTY!):
+## 5) Variables received from FEED_autoDTI.sh (Add variables to this list and FEED_autoDTI.sh as necessary to expand/customize). NOTE: ORDER MATTERS (I.E. MUST CORRESPOND TO THE ORDER SUPPPLIED AT THE END OF FEED_autoDTI.sh AND ALL VARIABLES BEING RECEIVED CANNOT BE EMPTY!):
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 dwi_dir=${1} ##Source directory for DWI raw dicoms
@@ -32,7 +32,7 @@ OddSlices=${4} ##Value equal to 1 or 2 specifying which slice (bottom or top) sh
 PARTIC=${5} ##Participant ID used to label folders and files
 sequence=${6} ##Number corresponding to a sequence acceleration factor (e.g. multiband 2 or 3) or any arbitrary number you wish to distinguish analysis runs when using data from differing sequence types
 T1directory=${7} ##Source directory for T1 MPRAGE raw dicoms
-Study=${8} ##A base folder (must actually exist) where openDTI will run its operations
+Study=${8} ##A base folder (must actually exist) where autoDTI will run its operations
 preproc=${9} ##Binary switch variable to indicate whether or not preprocessing will be run
 tracula=${10} ##Binary switch variable to indicate whether or not tracula will be run
 buildsurf=${11} ##Binary switch variable to indicate whether or not surface reconstruction will be run
@@ -41,13 +41,13 @@ eddy_type=${13} ##Binary switch variable to indicate whether old eddy_correct or
 bpx=${14} ##Binary switch variable to indicate whether or not bedpostx will be run
 parcellate=${15} ##Binary switch variable to indicate whether or not FREESURFER reconstruction will be run
 stats=${16} ##Binary switch variable to indicate whether or not key metrics from tracula and freesurfer output will be extracted to a .csv file
-NumCores=${17} ##Number of cores to be used in the pipeline run. *Note: If the -n flag is used, however, it will override the default specified in FEED_openDTI.sh configuration options section.
+NumCores=${17} ##Number of cores to be used in the pipeline run. *Note: If the -n flag is used, however, it will override the default specified in FEED_autoDTI.sh configuration options section.
 E_switch=${18} ##Binary switch variable to indicate whether or not to run new Eddy after -avr check has been performed with old eddy_correct
 NRRD=${19} ##Binary switch variable to indicate whether or not .NRRD conversion will be run
-parallel_type=${20}  ##variable indicating the job scheduler type used if batch queueing system is installed. This is defined in FEED_openDTI.sh configuration options section.
+parallel_type=${20}  ##variable indicating the job scheduler type used if batch queueing system is installed. This is defined in FEED_autoDTI.sh configuration options section.
 QA=${21} ##Binary switch variable to indicate whether or not FREESURFER's Quality Assessment tool will be run
-NumCoresMP=${22} ##Number of LOCAL cores to be used in the pipeline run. This is detected automatically in FEED_openDTI.sh
-NLSAM=${23} ##Binary switch variable to indicate whether or not NLSAM denoising will be run
+NumCoresMP=${22} ##Number of LOCAL cores to be used in the pipeline run. This is detected automatically in FEED_autoDTI.sh
+denoising=${23} ##Denoising type
 noconv=${24} ##Binary switch variable to indicate whether or not dicom-nifti conversion of the raw dwi image should be skipped for this run
 after_eddy=${25} ##Binary switch variable to indicate whether or not eddy correction should be skipped for this run
 det_tractography=${26} ##Binary switch variable to indicate whether or not deterministic tractography will be run
@@ -78,9 +78,9 @@ reslice=${50} ##Active conversion to isotropic voxels
 TOTAL_READOUT=${51} ##Total readout value (for topup/eddy) 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 
-##Exit if run without FEED_openDTI.sh
+##Exit if run without FEED_autoDTI.sh
 if [ $# -eq 0 ]; then
-    echo -e "\n\n\nYou must run openDTI by feeding command-line inputs to FEED_openDTI.sh. Type: FEED_openDTI.sh -h for command-line options. See README.txt for more instructions.\n\n\n"
+    echo -e "\n\n\nYou must run autoDTI by feeding command-line inputs to FEED_autoDTI.sh. Type: FEED_autoDTI.sh -h for command-line options. See README.txt for more instructions.\n\n\n"
     exit 1
 fi
 
@@ -136,7 +136,7 @@ fi
 ##################################################################
 if [[ $preproc == 1 ]]; then    
     echo -e "\n\n\nRUNNING PREPROCESSING for "$PARTIC"...\n\n\n"
-    preprocess.sh "$dwi_dir" "$P2A" "$output_dir" "$OddSlices" "$PARTIC" "$sequence" "$T1directory" "$Study" "$preproc" "$tracula" "$buildsurf" "$probtracking" "$eddy_type" "$bpx" "$parcellate" "$stats" "$NumCores" "$E_switch" "$NRRD" "$parallel_type" "$QA" "$NumCoresMP" "$NLSAM" "$noconv" "$after_eddy" "$det_tractography" "$fieldmap" "$mag_dir" "$phase_dir" "$rotate_bvecs" "$tensor" "$volrem" "$auto_volrem" "$dwell" "$det_type" "$gpu" "$reinit_check" "$omp_pe" "$view_outs" "$max_gpu_threads" "$TE" "$conversion_type" "$SCANNER" "$Numcoils" "$starting" "$NRRD" "$prep_nodes" "$debug" "$ALLOCATION" "$reslice" "$TOTAL_READOUT"
+    preprocess.sh "$dwi_dir" "$P2A" "$output_dir" "$OddSlices" "$PARTIC" "$sequence" "$T1directory" "$Study" "$preproc" "$tracula" "$buildsurf" "$probtracking" "$eddy_type" "$bpx" "$parcellate" "$stats" "$NumCores" "$E_switch" "$NRRD" "$parallel_type" "$QA" "$NumCoresMP" "$denoising" "$noconv" "$after_eddy" "$det_tractography" "$fieldmap" "$mag_dir" "$phase_dir" "$rotate_bvecs" "$tensor" "$volrem" "$auto_volrem" "$dwell" "$det_type" "$gpu" "$reinit_check" "$omp_pe" "$view_outs" "$max_gpu_threads" "$TE" "$conversion_type" "$SCANNER" "$Numcoils" "$starting" "$NRRD" "$prep_nodes" "$debug" "$ALLOCATION" "$reslice" "$TOTAL_READOUT"
     trap "exit" INT
     until [ -f "$output_dir"/"$PARTIC"/"DONE_PREPROCESSING" ]; do
              sleep 5
@@ -165,7 +165,7 @@ fi
 if [[ $det_tractography == 1 ]]; then
     ##Check preprocessing inputs before running deterministic tractography    
     if [ ! -f ""$output_dir"/"$PARTIC"/eddy_corrected_data_denoised.nii.gz" ] && [ ! -f ""$output_dir"/"$PARTIC"/eddy_corrected_data_nodenoised.nii.gz" ]; then
-        echo -e "\n\n\nERROR: Need to run preprocessing first! Minimally, you will need to run FEED_openDTI.sh using the -prep flag"
+        echo -e "\n\n\nERROR: Need to run preprocessing first! Minimally, you will need to run FEED_autoDTI.sh using the -prep flag"
         exit 0
     fi
         
@@ -183,7 +183,7 @@ fi
 ##Check Inputs before tensor/ ball-and-stick fitting
 if [[ $tensor == 1 || $bpx == 1 ]]; then    
     if [ ! -f ""$output_dir"/"$PARTIC"/eddy_corrected_data_denoised.nii.gz" ] && [ ! -f ""$output_dir"/"$PARTIC"/eddy_corrected_data_nodenoised.nii.gz" ]; then
-        echo -e "\n\n\nERROR: Need to run preprocessing first! Minimally, you will need to run FEED_openDTI.sh using the -prep flag"
+        echo -e "\n\n\nERROR: Need to run preprocessing first! Minimally, you will need to run FEED_autoDTI.sh using the -prep flag"
         exit 0
     fi
 fi

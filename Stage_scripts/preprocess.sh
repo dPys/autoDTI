@@ -1,21 +1,21 @@
 #!/bin/bash
-#    openDTI: A dMRI pipeline for efficient and comprehensive DTI analysis
+#    autoDTI: A dMRI pipeline for efficient and comprehensive DTI analysis
 #    Copyright (C) 2016  AUTHOR: Derek Pisner
 #    Contributors: Adam Bernstein, Aleksandra Klimova, Matthew Allbright
 #
-#    openDTI is free software: you can redistribute it and/or modify
+#    autoDTI is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU Affero General Public License as published
 #    by the Free Software Foundation, either version 3 of the License, or
 #    (at your option) any later version.
 #
-#    openDTI is distributed in the hope that it will be useful,
+#    autoDTI is distributed in the hope that it will be useful,
 #    but WITHOUT ANY WARRANTY; without even the implied warranty of
 #    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #    GNU Affero General Public License for more details.
 #
 #    You should have received a copy of the complete GNU Affero General Public
-#    License with openDTI in a file called LICENSE.txt. If not, and/or you simply have
-#    questions about licensing and copyright/patent restrictions with openDTI, please
+#    License with autoDTI in a file called LICENSE.txt. If not, and/or you simply have
+#    questions about licensing and copyright/patent restrictions with autoDTI, please
 #    contact the primary author, Derek Pisner, at dpisner@utexas.edu
 
 ##Variable inputs
@@ -26,7 +26,7 @@ OddSlices=${4} ##Value equal to 1 or 2 specifying which slice (bottom or top) sh
 PARTIC=${5} ##Participant ID used to label folders and files
 sequence=${6} ##Number corresponding to a sequence acceleration factor (e.g. multiband 2 or 3) or any arbitrary number you wish to distinguish analysis runs when using data from differing sequence types
 T1directory=${7} ##Source directory for T1 MPRAGE raw dicoms
-Study=${8} ##A base folder (must actually exist) where openDTI will run its operations
+Study=${8} ##A base folder (must actually exist) where autoDTI will run its operations
 preproc=${9} ##Binary switch variable to indicate whether or not preprocessing will be run
 tracula=${10} ##Binary switch variable to indicate whether or not tracula will be run
 buildsurf=${11} ##Binary switch variable to indicate whether or not surface reconstruction will be run
@@ -35,13 +35,13 @@ eddy_type=${13} ##Binary switch variable to indicate whether old eddy_correct or
 bpx=${14} ##Binary switch variable to indicate whether or not bedpostx will be run
 parcellate=${15} ##Binary switch variable to indicate whether or not FREESURFER reconstruction will be run
 stats=${16} ##Binary switch variable to indicate whether or not key metrics from tracula and freesurfer output will be extracted to a .csv file
-NumCores=${17} ##Number of cores to be used in the pipeline run. *Note: If the -n flag is used, however, it will override the default specified in FEED_openDTI.sh configuration options section.
+NumCores=${17} ##Number of cores to be used in the pipeline run. *Note: If the -n flag is used, however, it will override the default specified in FEED_autoDTI.sh configuration options section.
 E_switch=${18} ##Binary switch variable to indicate whether or not to run new Eddy after -avr check has been performed with old eddy_correct
 NRRD=${19} ##Binary switch variable to indicate whether or not .NRRD conversion will be run
-parallel_type=${20}  ##variable indicating the job scheduler type used if batch queueing system is installed. This is defined in FEED_openDTI.sh configuration options section.
+parallel_type=${20}  ##variable indicating the job scheduler type used if batch queueing system is installed. This is defined in FEED_autoDTI.sh configuration options section.
 QA=${21} ##Binary switch variable to indicate whether or not FREESURFER's Quality Assessment tool will be run
-NumCoresMP=${22} ##Number of LOCAL cores to be used in the pipeline run. This is detected automatically in FEED_openDTI.sh
-NLSAM=${23} ##Binary switch variable to indicate whether or not NLSAM denoising will be run
+NumCoresMP=${22} ##Number of LOCAL cores to be used in the pipeline run. This is detected automatically in FEED_autoDTI.sh
+denoising=${23} ##Denoising type
 noconv=${24} ##Binary switch variable to indicate whether or not dicom-nifti conversion of the raw dwi image should be skipped for this run
 after_eddy=${25} ##Binary switch variable to indicate whether or not eddy correction should be skipped for this run
 det_tractography=${26} ##Binary switch variable to indicate whether or not deterministic tractography will be run
@@ -72,13 +72,13 @@ reslice=${50} ##Switch to relice to isotropic voxels
 TOTAL_READOUT=${51} ##Total readout value (for topup/eddy)
 
 #####PREPROCESSING--ADVANCED CONFIGURATION OPTIONS######
-frac_thresh=0.2 ##for BET fractional intensity thresholds
-fugue_smooth=4 ##Set fugue smoothing level for fieldmap correction
+frac_thresh="0.2" ##for BET fractional intensity thresholds
+fugue_smooth="4" ##Set fugue smoothing level for fieldmap correction
 ########################################################
 
-##Exit if run without FEED_openDTI.sh
+##Exit if run without FEED_autoDTI.sh
 if [ $# -eq 0 ]; then
-    echo -e "\n\n\nYou must run openDTI by feeding command-line inputs to FEED_openDTI.sh. Type: FEED_openDTI.sh -h for command-line options. See README.txt for more instructions.\n\n\n"
+    echo -e "\n\n\nYou must run autoDTI by feeding command-line inputs to FEED_autoDTI.sh. Type: FEED_autoDTI.sh -h for command-line options. See README.txt for more instructions.\n\n\n"
     exit 1
 fi
 
@@ -320,7 +320,7 @@ if [[ $after_eddy != 1 ]]; then
         echo -e "\n\n\nRUNNING EDDY CORRECTION...\n\n\n"
 
         if [[ $parallel_type == 'SGE' ]] || [[ $parallel_type == 'PBS' ]] || [[ $parallel_type == 'SLURM' ]]; then
-	          export OMP_NUM_THREADS="$NumCores"
+	          export OMP_NUM_THREADS="$NumCoresMP"
             eddy_openmp --imain=original_data.nii.gz --mask=hifi_b0_brain_mask.nii.gz --acqp=parameters.txt --index=index1.txt --bvecs=bvec --bvals=bval --out=eddy_corrected_data.nii.gz
 	          wait
         elif [[ $parallel_type == 'none' ]] || [[ $parallel_type == 'Null' ]]; then
@@ -382,11 +382,12 @@ if [[ $after_eddy != 1 ]]; then
         done
 
         ##Create index file based on directions and B0 placement
-        indx=""
+        VOLS_TOTAL_tmp=`echo $(echo $VOLS_TOTAL - 1 | bc)`
+	indx=""
         b0s_list=`echo "$(< b0_indices_trans)"`
         k=1
         j=1
-        for ((i=1; i<="$VOLS_TOTAL"; i+=1)); do
+        for ((i=1; i<="$VOLS_TOTAL_tmp"; i+=1)); do
             if [[ $k == 1 ]]; then
                 #echo "B0"
                 indx="$indx "1"";
@@ -399,8 +400,7 @@ if [[ $after_eddy != 1 ]]; then
             #echo $indx
             k=$(( $k + 1 ))
         done
-        echo "$indx" > index1.txt
-        sed -i 's/^ *//' index1.txt
+        echo "$indx" | sed 's/^  *//g' > index1.txt
 
         ##Extract and Combine all B0s collected for TOPUP
         for b0_index in $(< b0_indices_trans); do
@@ -444,7 +444,7 @@ if [[ $after_eddy != 1 ]]; then
 	##Run Eddy
         echo -e "\n\n\nRUNNING EDDY CORRECTION...\n\n\n"
         if [[ $parallel_type == 'SGE' ]] || [[ $parallel_type == 'PBS' ]] || [[ $parallel_type == 'SLURM' ]]; then
-            export OMP_NUM_THREADS="$NumCores"
+            export OMP_NUM_THREADS="$NumCoresMP"
             eddy_openmp --imain=original_data.nii.gz --mask=hifi_b0_brain_mask.nii.gz --acqp=parameters.txt --index=index1.txt --bvecs=bvec --bvals=bval --out=eddy_corrected_data.nii.gz
 	    wait
         elif [[ $parallel_type == 'none' ]] || [[ $parallel_type == 'Null' ]]; then
@@ -542,7 +542,7 @@ if [[ $auto_volrem == 1 ]]; then
 
     ##Extract white-matter mask for SNR calculation
     echo -e "\n\n\nExtracting SNR estimates for each directional volume...\n\n\n"
-    python $openDTI_HOME/Py_function_library/SNR_estimation.py "$output_dir"/"$PARTIC"/original_data.nii.gz "$output_dir"/"$PARTIC"/bval "$output_dir"/"$PARTIC"/bvec "0.25"
+    python $autoDTI_HOME/Py_function_library/SNR_estimation.py "$output_dir"/"$PARTIC"/original_data.nii.gz "$output_dir"/"$PARTIC"/bval "$output_dir"/"$PARTIC"/bvec "0.25"
     wait
     if [ -f LOW_SNR_VOLS_LIST.txt ]; then
         high_noise_vols=`cat LOW_SNR_VOLS_LIST.txt`
@@ -551,7 +551,7 @@ if [[ $auto_volrem == 1 ]]; then
     ##Check for venetian blind effect on any individual 3d volumes
     rm -f bad_vols_intraslice.txt 2>/dev/null
     echo -e "\n\n\nUsing interlaced slicewise correlation to check for signal drop-out slices (i.e. the \"venentian blind effect\") across each z-slice of every 3d DWI volume...\n\n\n"
-    python $openDTI_HOME/Py_function_library/venetian_blind_check.py 'eddy_corrected_data.nii.gz' 0.05
+    python $autoDTI_HOME/Py_function_library/venetian_blind_check.py 'eddy_corrected_data.nii.gz' 0.05
     wait
     if [ -f bad_vols_intraslice.txt ]; then
         venetian_blind_vols=`cat bad_vols_intraslice.txt`
@@ -768,7 +768,7 @@ elif [[ $rerun_prep == 1 ]]; then
     echo -e "Elapsed (AVR): "$elapsed_time"\n" >> "$output_dir"/"$PARTIC"/elapsed_time.log
     ##Reinitiate preprocessing
     echo -e "\n\n\nQUALITY CONTROL COMPLETE\nReinitiating preprocessing with updated base dataset...\n\n\n"
-    openDTI.sh "$dwi_dir" "$P2A" "$output_dir" "$OddSlices" "$PARTIC" "$sequence" "$T1directory" "$Study" "$preproc" "$tracula" "$buildsurf" "$probtracking" "$eddy_type" "$bpx" "$parcellate" "$stats" "$NumCores" "$E_switch" "$NRRD" "$parallel_type" "$QA" "$NumCoresMP" "$NLSAM" "$noconv" "$after_eddy" "$det_tractography" "$fieldmap" "$mag_dir" "$phase_dir" "$rotate_bvecs" "$tensor" "$volrem" "$auto_volrem" "$dwell" "$det_type" "$gpu" "$reinit_check" "$omp_pe" "$view_outs" "$max_gpu_threads" "$TE" "$conversion_type" "$SCANNER" "$Numcoils" "$starting" "$NRRD" "$prep_nodes" "$ALLOCATION" "$debug" "$reslice" "$TOTAL_READOUT"
+    autoDTI.sh "$dwi_dir" "$P2A" "$output_dir" "$OddSlices" "$PARTIC" "$sequence" "$T1directory" "$Study" "$preproc" "$tracula" "$buildsurf" "$probtracking" "$eddy_type" "$bpx" "$parcellate" "$stats" "$NumCores" "$E_switch" "$NRRD" "$parallel_type" "$QA" "$NumCoresMP" "$denoising" "$noconv" "$after_eddy" "$det_tractography" "$fieldmap" "$mag_dir" "$phase_dir" "$rotate_bvecs" "$tensor" "$volrem" "$auto_volrem" "$dwell" "$det_type" "$gpu" "$reinit_check" "$omp_pe" "$view_outs" "$max_gpu_threads" "$TE" "$conversion_type" "$SCANNER" "$Numcoils" "$starting" "$NRRD" "$prep_nodes" "$ALLOCATION" "$debug" "$reslice" "$TOTAL_READOUT"
     exit
 fi
 
@@ -878,7 +878,7 @@ else
 fi
 
 ##Denoising options
-if [[ $NLSAM == 1 ]]; then
+if [[ $denoising == "NLSAM" ]] || [[ $denoising == "NLMEANS" ]]; then
     echo -e "\n\n\nRUNNING DENOISING...\n\n\n"
     ##Determine N
     if [[ $SCANNER == SIEMENS ]]; then
@@ -899,8 +899,7 @@ if [[ $NLSAM == 1 ]]; then
         wait
     fi
 
-    if [[ $parallel_type == 'SGE' ]] || [[ $parallel_type == 'PBS' ]] || [[ $parallel_type == 'SLURM' ]]; then
-
+    if [[ $denoising == "NLSAM" ]]; then
         ##Determine number of z slices to determine max_threads
         z_slices=`fslval "$output_dir"/"$PARTIC"/original_data.nii.gz dim3`
 
@@ -914,9 +913,13 @@ if [[ $NLSAM == 1 ]]; then
       	##NLSAM
       	nlsam_denoising "$output_dir"/"$PARTIC"/"$input" "$output_dir"/"$PARTIC"/eddy_corrected_data_denoised.nii.gz $N "$output_dir"/"$PARTIC"/bval "$output_dir"/"$PARTIC"/bvec 5 -m "$output_dir"/"$PARTIC"/bet_mask.nii.gz --cores $NumCoresMP -f
       	wait
-    else
+    elif [[ $denoising == "NLMEANS" ]]; then
       	##NLMEANS
-      	$openDTI_HOME/Py_function_library/denoise.py "$output_dir"/"$PARTIC"/"$input" "$output_dir"/"$PARTIC"/eddy_corrected_data_denoised.nii.gz
+	N=1
+      	$autoDTI_HOME/Py_function_library/denoise.py "$output_dir"/"$PARTIC"/"$input" "$output_dir"/"$PARTIC"/bval "$output_dir"/"$PARTIC"/bvec "$output_dir"/"$PARTIC"/"bet_mask.nii.gz" "$N"
+
+	fslmerge -t eddy_corrected_data_denoised.nii.gz `ls -1v *denoised_tmp.nii.gz`
+	rm -f *denoised_tmp.nii.gz
       	wait
     fi
     curr_timestamp=$(date +%s)
@@ -924,7 +927,7 @@ if [[ $NLSAM == 1 ]]; then
     echo -e "Elapsed (Denoising): "$elapsed_time"\n" >> "$output_dir"/"$PARTIC"/elapsed_time.log
 fi
 
-if [[ $NLSAM != 1 ]] && [ ! -f "$output_dir"/"$PARTIC"/eddy_corrected_data_denoised.nii.gz ]; then
+if [ -z $denoising ] && [ ! -f "$output_dir"/"$PARTIC"/eddy_corrected_data_denoised.nii.gz ]; then
     mv -v "$output_dir"/"$PARTIC"/""$input".nii.gz" "$output_dir"/"$PARTIC"/eddy_corrected_data_nodenoised.nii.gz 2>/dev/null
     wait
 fi
@@ -966,7 +969,7 @@ fi
 ##Convert preprocessed image to isotropic voxels
 if [[ $reslice == 1 ]]; then
     cd "$output_dir"/"$PARTIC"
-    python -W ignore $openDTI_HOME/Py_function_library/reslice_to_iso.py $preprocessed_img
+    python -W ignore $autoDTI_HOME/Py_function_library/reslice_to_iso.py $preprocessed_img
     echo "CONVERTED $preprocessed_img TO ISOTROPIC file iso_"$preprocessed_img"" >  ani2iso.log
     preprocessed_img="iso_"$preprocessed_img""
 fi
