@@ -1,9 +1,9 @@
 ![autoDTI logo](autoDTI_logo.png)
 
 ```
-autoDTI: A dMRI pipeline for efficient and comprehensive DTI analysis
+autoDTI: A UNIX-Python hybrid pipeline for fully-automated analysis of dMRI
 Copyright (C) 2016  AUTHOR: Derek Pisner
-Contributors: Adam Bernstein, Aleksandra Klimova, Matthew Allbright
+Contributors: Adam Bernstein, Aleksandra Klimova, Matthew Allbright, Lucas Wilson, Samuel St. Jean, David Schnyer
 
 autoDTI is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published
